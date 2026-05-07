@@ -348,7 +348,7 @@ const TopBar = ({ activeCampus, setActiveCampus, pageTitle, pageSubtitle }) => {
           )}
         </div>
 
-        <button style={{ position: "relative", border: "none", background: COLORS.surface, padding: 9, borderRadius: 10, cursor: "pointer", border: `1px solid ${COLORS.border}` }}>
+        <button style={{ position: "relative", background: COLORS.surface, padding: 9, borderRadius: 10, cursor: "pointer", border: `1px solid ${COLORS.border}` }}>
           <Bell size={16} color={COLORS.ink} />
           <span style={{ position: "absolute", top: 6, right: 6, width: 7, height: 7, borderRadius: "50%", backgroundColor: COLORS.red }} />
         </button>
