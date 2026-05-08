@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import {
   LayoutDashboard, HandHeart, Receipt, Users, Building2, Calendar,
   FileText, Plug, Settings, Search, Bell, ChevronDown, Plus, Upload,
@@ -234,6 +234,42 @@ const LAST_MONTH_SPEND = {
   merch: 1015,
 };
 
+// 6-month forecast per ministry — synthetic seasonal patterns.
+// Real implementation would be statistical projection from years of data.
+const FORECAST_HISTORY = {
+  worship:        [88, 92, 90, 95, 93, 91],   // stable, slight fall bump
+  technical:      [102, 105, 100, 98, 103, 99], // pattern persists, still over
+  video:          [62, 65, 68, 64, 67, 65],   // continues under
+  "light-screen": [55, 70, 60, 75, 65, 60],   // still volatile
+  media:          [80, 82, 81, 83, 82, 80],   // stable
+  kids:           [85, 60, 55, 88, 92, 105],  // summer dip, Christmas peak
+  teens:          [60, 80, 88, 65, 62, 60],   // summer camp peak
+  youth:          [82, 95, 92, 80, 78, 84],   // summer peak
+  "single-mom":   [50, 48, 52, 55, 58, 50],   // continues under
+  deaf:           [56, 58, 55, 60, 58, 57],   // continues under
+  legacy:         [52, 50, 55, 58, 55, 52],   // continues under
+  services:       [89, 88, 90, 92, 93, 90],   // stable, slight fall bump
+  target:         [83, 82, 84, 85, 83, 84],   // stable
+  merch:          [94, 93, 92, 95, 96, 100],  // stable, peaks Dec
+};
+
+// Seed activity log — represents the audit trail for the past few days.
+const INITIAL_ACTIVITY_LOG = [
+  { id: 1, type: "roll", who: "Elena Volkov", ministry: "Worship", amount: 413, note: "April leftover rolled forward to May allocation", timestamp: "2026-05-07T14:30:00" },
+  { id: 2, type: "return", who: "Elena Volkov", ministry: "Legacy", amount: 158, note: "April leftover returned to general fund", timestamp: "2026-05-07T14:28:00" },
+  { id: 3, type: "return", who: "Elena Volkov", ministry: "Single Moms", amount: 377, note: "April leftover returned to general fund", timestamp: "2026-05-07T14:27:00" },
+  { id: 4, type: "budget", who: "Pastor Vladimir", ministry: "Single Moms", amount: -3500, note: "Annual budget reduced from $8,000 to $4,500 based on 6-month utilization", timestamp: "2026-05-07T11:15:00" },
+  { id: 5, type: "notification", who: "System", ministry: "Single Moms", amount: 0, note: "Email sent to Olga S. — budget reduction notification with reasoning", timestamp: "2026-05-07T11:15:00" },
+  { id: 6, type: "alert", who: "System", ministry: "Technical", amount: 0, note: "Alert: Technical ministry exceeded 95% of monthly budget", timestamp: "2026-05-06T22:04:00" },
+  { id: 7, type: "review", who: "Pastor Vladimir", ministry: null, amount: 0, note: "Q1 2026 budget review approved — 4 reductions applied, 1 increase applied", timestamp: "2026-05-06T16:30:00" },
+  { id: 8, type: "budget", who: "Pastor Vladimir", ministry: "Technical", amount: 4000, note: "Annual budget increased from $38,000 to $42,000 — 2 months over allocation", timestamp: "2026-05-06T16:25:00" },
+  { id: 9, type: "notification", who: "System", ministry: "Technical", amount: 0, note: "Email sent to Mark D. — budget increase notification", timestamp: "2026-05-06T16:25:00" },
+  { id: 10, type: "roll", who: "Anna Kovalenko", ministry: "Media", amount: 160, note: "April leftover rolled forward to May allocation", timestamp: "2026-05-06T10:12:00" },
+  { id: 11, type: "alert", who: "System", ministry: null, amount: 0, note: "Alert: 1 receipt pending review more than 7 days (Walmart, $425.66)", timestamp: "2026-05-05T08:00:00" },
+  { id: 12, type: "roll", who: "Maria Rojas", ministry: "Kids Ministry", amount: 187, note: "April leftover rolled forward to May allocation", timestamp: "2026-05-05T09:45:00" },
+  { id: 13, type: "review", who: "Pastor Vladimir", ministry: null, amount: 0, note: "Quarterly review snoozed for 7 days", timestamp: "2026-05-04T18:00:00" },
+];
+
 // 6-month utilization history per ministry (% of monthly budget spent).
 // Drives the recommendations engine pattern detection.
 const UTILIZATION_HISTORY = {
@@ -298,7 +334,8 @@ function classifyMinistry(m) {
 
   const suggestedBudget = RECOMMENDATIONS_OVERRIDE[m.id] ?? null;
   const delta = suggestedBudget != null ? suggestedBudget - m.budget : 0;
-  return { type, confidence, reasoning, history, avg, max, min, range, suggestedBudget, delta };
+  const forecast = FORECAST_HISTORY[m.id] || [];
+  return { type, confidence, reasoning, history, forecast, avg, max, min, range, suggestedBudget, delta };
 }
 
 const STRESS_SCENARIOS = [
@@ -429,6 +466,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
     { id: "administrators", label: "Administrators", icon: UserPlus },
     { id: "events", label: "Events & Camps", icon: Calendar },
     { id: "receipts", label: "Receipts", icon: Paperclip },
+    { id: "activity", label: "Activity", icon: Activity },
     { id: "people", label: "People & Roles", icon: Shield },
     { id: "integrations", label: "Integrations", icon: Plug },
     { id: "reports", label: "Reports", icon: FileText },
@@ -1198,7 +1236,7 @@ const AlertsLivePanel = ({ alerts, config, ministries }) => {
 // END-OF-MONTH RECONCILIATION
 // ============================================================
 
-const ReconciliationSection = ({ ministries }) => {
+const ReconciliationSection = ({ ministries, logActivity }) => {
   const [decisions, setDecisions] = useState({});
 
   const items = ministries.map((m) => {
@@ -1215,10 +1253,33 @@ const ReconciliationSection = ({ ministries }) => {
   const rolled = items.filter((i) => decisions[i.id] === "roll").reduce((s, i) => s + i.leftover, 0);
   const returned = items.filter((i) => decisions[i.id] === "return").reduce((s, i) => s + i.leftover, 0);
 
-  const decide = (id, action) => setDecisions((d) => ({ ...d, [id]: action }));
+  const decide = (item, action) => {
+    if (decisions[item.id] === action) return; // no-op
+    setDecisions((d) => ({ ...d, [item.id]: action }));
+    logActivity({
+      type: action === "roll" ? "roll" : "return",
+      ministry: item.name,
+      amount: item.leftover,
+      note: action === "roll"
+        ? `April leftover rolled forward to May allocation`
+        : `April leftover returned to general fund`,
+    });
+  };
   const decideAll = (action) => {
     const next = { ...decisions };
-    for (const i of eligible) next[i.id] = action;
+    for (const i of eligible) {
+      if (next[i.id] !== action) {
+        next[i.id] = action;
+        logActivity({
+          type: action === "roll" ? "roll" : "return",
+          ministry: i.name,
+          amount: i.leftover,
+          note: action === "roll"
+            ? `April leftover rolled forward to May allocation (bulk)`
+            : `April leftover returned to general fund (bulk)`,
+        });
+      }
+    }
     setDecisions(next);
   };
 
@@ -1284,10 +1345,10 @@ const ReconciliationSection = ({ ministries }) => {
                   <Pill tone="copper">↺ Returned to fund</Pill>
                 ) : (
                   <>
-                    <button onClick={() => decide(m.id, "roll")} style={{ padding: "6px 12px", backgroundColor: COLORS.cream, color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 6, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: fontBody }}>
+                    <button onClick={() => decide(m, "roll")} style={{ padding: "6px 12px", backgroundColor: COLORS.cream, color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 6, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: fontBody }}>
                       Roll
                     </button>
-                    <button onClick={() => decide(m.id, "return")} style={{ padding: "6px 12px", backgroundColor: COLORS.cream, color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 6, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: fontBody }}>
+                    <button onClick={() => decide(m, "return")} style={{ padding: "6px 12px", backgroundColor: COLORS.cream, color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 6, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: fontBody }}>
                       Return
                     </button>
                   </>
@@ -1305,17 +1366,46 @@ const ReconciliationSection = ({ ministries }) => {
 // SMART BUDGET RECOMMENDATIONS
 // ============================================================
 
-const MiniBarChart = ({ history }) => (
-  <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 36, width: 90 }}>
-    {history.map((v, i) => {
-      const color = v > 100 ? COLORS.red : v < 65 ? COLORS.amber : COLORS.green;
-      const heightPct = Math.min(v, 110) / 110 * 100;
-      return (
-        <div key={i} style={{ width: 10, height: `${heightPct}%`, backgroundColor: color, borderRadius: 2, opacity: 0.85 }} title={`Month ${i + 1}: ${v}%`} />
-      );
-    })}
-  </div>
-);
+// MiniBarChart renders past + (optional) forecast. Forecast bars render at
+// lower opacity with a dashed top border, separated by a copper divider line.
+const MONTH_LABELS_PAST = ["6mo ago", "5mo ago", "4mo ago", "3mo ago", "2mo ago", "1mo ago"];
+const MONTH_LABELS_FUTURE = ["Next mo", "+2 mo", "+3 mo", "+4 mo", "+5 mo", "+6 mo"];
+const MiniBarChart = ({ history, forecast }) => {
+  const colorFor = (v) => (v > 100 ? COLORS.red : v < 65 ? COLORS.amber : COLORS.green);
+  const heightFor = (v) => `${Math.min(v, 110) / 110 * 100}%`;
+  const totalBars = history.length + (forecast?.length || 0);
+  const width = totalBars * 9 + (forecast?.length ? 6 : 0); // include divider gap
+
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 36, width }}>
+      {history.map((v, i) => (
+        <div
+          key={`p-${i}`}
+          style={{ width: 7, height: heightFor(v), backgroundColor: colorFor(v), borderRadius: 2, opacity: 0.9, flexShrink: 0 }}
+          title={`${MONTH_LABELS_PAST[i] || `M${i + 1}`}: ${v}% (actual)`}
+        />
+      ))}
+      {forecast && forecast.length > 0 && (
+        <>
+          <div style={{ width: 1, height: "100%", backgroundColor: COLORS.copper, opacity: 0.5, margin: "0 2px", flexShrink: 0 }} title="Past | Forecast" />
+          {forecast.map((v, i) => (
+            <div
+              key={`f-${i}`}
+              style={{
+                width: 7, height: heightFor(v),
+                backgroundColor: colorFor(v) + "30",
+                border: `1px dashed ${colorFor(v)}`,
+                borderRadius: 2,
+                flexShrink: 0,
+              }}
+              title={`${MONTH_LABELS_FUTURE[i] || `+${i + 1}mo`}: ${v}% (forecast)`}
+            />
+          ))}
+        </>
+      )}
+    </div>
+  );
+};
 
 const REC_TONE = {
   reduce: { color: COLORS.amber, label: "REDUCE", pillTone: "warn" },
@@ -1324,10 +1414,11 @@ const REC_TONE = {
   "on-track": { color: COLORS.green, label: "ON TRACK", pillTone: "success" },
 };
 
-const RecommendationsSection = ({ ministries, updateMinistryBudget }) => {
+const RecommendationsSection = ({ ministries, updateMinistryBudget, logActivity }) => {
   const [applied, setApplied] = useState({});
   const [dismissed, setDismissed] = useState({});
   const [showOnTrack, setShowOnTrack] = useState(false);
+  const [notifyModal, setNotifyModal] = useState(null);
 
   // Re-classify against current ministries (uses live budget for delta computation).
   const classified = ministries.map((m) => ({ ministry: m, ...classifyMinistry(m) }));
@@ -1342,16 +1433,70 @@ const RecommendationsSection = ({ ministries, updateMinistryBudget }) => {
   const totalIncrease = groups.increase.reduce((s, c) => s + Math.max(0, c.delta), 0);
   const netSavings = totalReduceSavings - totalIncrease;
 
+  const logBudgetChange = (c, source = "recommendation") => {
+    logActivity({
+      type: "budget",
+      ministry: c.ministry.name,
+      amount: c.delta,
+      note: `Annual budget ${c.delta < 0 ? "reduced" : "increased"} from ${fmt(c.ministry.budget)} to ${fmt(c.suggestedBudget)} via ${source}`,
+    });
+  };
+  const logEmail = (c) => {
+    logActivity({
+      type: "notification",
+      who: "System",
+      ministry: c.ministry.name,
+      note: `Email sent to ${c.ministry.leader || "ministry leader"} — budget ${c.delta < 0 ? "reduction" : "increase"} notification with reasoning`,
+    });
+  };
+
+  // Reduce recs trigger the leader-notification preview modal first.
+  // Increases skip the modal — no need to soften an increase.
   const apply = (c) => {
-    if (c.suggestedBudget != null) updateMinistryBudget(c.ministry.id, c.suggestedBudget);
+    if (c.type === "reduce") {
+      setNotifyModal(c);
+    } else {
+      if (c.suggestedBudget != null) {
+        updateMinistryBudget(c.ministry.id, c.suggestedBudget);
+        logBudgetChange(c);
+      }
+      setApplied((a) => ({ ...a, [c.ministry.id]: true }));
+    }
+  };
+  const sendAndApply = (c) => {
+    if (c.suggestedBudget != null) {
+      updateMinistryBudget(c.ministry.id, c.suggestedBudget);
+      logBudgetChange(c);
+      logEmail(c);
+    }
     setApplied((a) => ({ ...a, [c.ministry.id]: true }));
+    setNotifyModal(null);
+  };
+  const applyWithoutNotify = (c) => {
+    if (c.suggestedBudget != null) {
+      updateMinistryBudget(c.ministry.id, c.suggestedBudget);
+      logBudgetChange(c, "recommendation (no notification)");
+    }
+    setApplied((a) => ({ ...a, [c.ministry.id]: true }));
+    setNotifyModal(null);
   };
   const dismiss = (id) => setDismissed((d) => ({ ...d, [id]: true }));
   const applyAll = () => {
     const next = { ...applied };
-    for (const c of [...groups.reduce, ...groups.increase]) {
-      if (c.suggestedBudget != null) updateMinistryBudget(c.ministry.id, c.suggestedBudget);
+    const all = [...groups.reduce, ...groups.increase];
+    for (const c of all) {
+      if (c.suggestedBudget != null) {
+        updateMinistryBudget(c.ministry.id, c.suggestedBudget);
+        logBudgetChange(c, "Apply all");
+      }
       next[c.ministry.id] = true;
+    }
+    if (all.length > 0) {
+      logActivity({
+        type: "review",
+        ministry: null,
+        note: `Apply all · ${groups.reduce.length} reduction${groups.reduce.length === 1 ? "" : "s"}, ${groups.increase.length} increase${groups.increase.length === 1 ? "" : "s"} applied in one click`,
+      });
     }
     setApplied(next);
   };
@@ -1363,7 +1508,7 @@ const RecommendationsSection = ({ ministries, updateMinistryBudget }) => {
       <div key={c.ministry.id} style={{
         padding: 16, borderRadius: 10, backgroundColor: COLORS.cream,
         border: `1px solid ${COLORS.borderSoft}`,
-        display: "grid", gridTemplateColumns: "auto 1fr 110px 180px 200px", gap: 16, alignItems: "center",
+        display: "grid", gridTemplateColumns: "auto 1fr 150px 180px 200px", gap: 16, alignItems: "center",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: c.ministry.color + "20", color: c.ministry.color, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fontDisplay, fontSize: 17, fontWeight: 600 }}>
@@ -1384,7 +1529,13 @@ const RecommendationsSection = ({ ministries, updateMinistryBudget }) => {
         <div style={{ fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.5, fontStyle: "italic" }}>
           {c.reasoning}
         </div>
-        <MiniBarChart history={c.history} />
+        <div>
+          <MiniBarChart history={c.history} forecast={c.forecast} />
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 9, color: COLORS.inkSoft, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.3 }}>
+            <span>6mo past · avg {Math.round(c.avg)}%</span>
+            <span style={{ color: COLORS.copper, opacity: 0.7 }}>6mo forecast</span>
+          </div>
+        </div>
         <div>
           {c.suggestedBudget != null ? (
             <>
@@ -1503,7 +1654,138 @@ const RecommendationsSection = ({ ministries, updateMinistryBudget }) => {
           ))}
         </div>
       )}
+
+      {notifyModal && (
+        <NotificationPreviewModal
+          rec={notifyModal}
+          onSendAndApply={() => sendAndApply(notifyModal)}
+          onApplyWithoutNotify={() => applyWithoutNotify(notifyModal)}
+          onCancel={() => setNotifyModal(null)}
+        />
+      )}
     </Card>
+  );
+};
+
+// ============================================================
+// NOTIFICATION PREVIEW MODAL — leader email preview before applying a reduction
+// ============================================================
+
+const NotificationPreviewModal = ({ rec, onSendAndApply, onApplyWithoutNotify, onCancel }) => {
+  const m = rec.ministry;
+  const firstName = (m.leader || "Leader").split(" ")[0];
+  const lastInitial = (m.leader || "").split(" ")[1] || "";
+  const email = `${firstName.toLowerCase()}@ircchurch.org`;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(10,10,10,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20 }} onClick={onCancel}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        backgroundColor: COLORS.surface, borderRadius: 16, width: 620, maxWidth: "100%", maxHeight: "90vh",
+        display: "flex", flexDirection: "column", boxShadow: "0 25px 80px rgba(0,0,0,0.6)",
+        border: `1px solid ${COLORS.border}`,
+      }}>
+
+        <div style={{ padding: "20px 24px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Mail size={16} color={COLORS.copper} />
+              <span style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>
+                Email preview · before sending
+              </span>
+            </div>
+            <div style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 600, color: COLORS.ink, marginTop: 4 }}>
+              Notify {firstName} {lastInitial} about {m.name} budget change
+            </div>
+          </div>
+          <button onClick={onCancel} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}>
+            <X size={18} color={COLORS.inkSoft} />
+          </button>
+        </div>
+
+        <div style={{ padding: 24, overflowY: "auto", flex: 1 }}>
+          {/* Email envelope */}
+          <div style={{ padding: "10px 14px", backgroundColor: COLORS.bg, borderRadius: 9, border: `1px solid ${COLORS.borderSoft}`, fontSize: 12, marginBottom: 14, fontFamily: "ui-monospace, monospace", lineHeight: 1.8 }}>
+            <div><span style={{ color: COLORS.inkSoft }}>From:</span> <span style={{ color: COLORS.ink }}>pastor.vladimir@ircchurch.org</span></div>
+            <div><span style={{ color: COLORS.inkSoft }}>To:</span> <span style={{ color: COLORS.ink }}>{firstName} {lastInitial} &lt;{email}&gt;</span></div>
+            <div><span style={{ color: COLORS.inkSoft }}>Cc:</span> <span style={{ color: COLORS.ink }}>elena@ircchurch.org</span></div>
+            <div><span style={{ color: COLORS.inkSoft }}>Subject:</span> <span style={{ color: COLORS.ink, fontWeight: 700 }}>2026 budget update for {m.name}</span></div>
+          </div>
+
+          {/* Email body */}
+          <div style={{ padding: 18, backgroundColor: COLORS.bg, borderRadius: 9, border: `1px solid ${COLORS.borderSoft}`, fontSize: 13, color: COLORS.ink, lineHeight: 1.65 }}>
+            <p style={{ margin: 0, marginBottom: 12 }}>Hi {firstName},</p>
+            <p style={{ margin: 0, marginBottom: 12 }}>
+              I wanted to give you a heads-up before this lands in your dashboard. After looking at six months of {m.name} spending, we're adjusting the annual budget for the rest of 2026.
+            </p>
+
+            <div style={{ padding: 14, backgroundColor: COLORS.cream, borderRadius: 8, margin: "12px 0", textAlign: "center" }}>
+              <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Annual budget change</div>
+              <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 600, color: COLORS.ink, marginTop: 4 }}>
+                {fmt(m.budget)} <span style={{ color: COLORS.copper }}>→</span> {fmt(rec.suggestedBudget)}
+              </div>
+              <div style={{ fontSize: 12, color: rec.delta < 0 ? COLORS.green : COLORS.copper, fontWeight: 700, marginTop: 4 }}>
+                {rec.delta < 0 ? "−" : "+"}{fmt(Math.abs(rec.delta))}/year
+              </div>
+            </div>
+
+            <p style={{ margin: 0, marginBottom: 8 }}>
+              <strong>Here's the reasoning:</strong>
+            </p>
+            <p style={{ margin: 0, marginBottom: 12, fontStyle: "italic", color: COLORS.inkSoft }}>
+              {rec.reasoning}
+            </p>
+
+            {/* Embedded chart */}
+            <div style={{ padding: 14, backgroundColor: COLORS.surface, borderRadius: 8, border: `1px solid ${COLORS.border}`, margin: "12px 0" }}>
+              <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, marginBottom: 8 }}>
+                {m.name} · last 6 months · % of budget used
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 50 }}>
+                {rec.history.map((v, i) => {
+                  const color = v > 100 ? COLORS.red : v < 65 ? COLORS.amber : COLORS.green;
+                  return (
+                    <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                      <div style={{ width: "100%", height: `${Math.min(v, 110) / 110 * 100}%`, backgroundColor: color, borderRadius: 2, opacity: 0.85 }} />
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ display: "flex", marginTop: 6, gap: 4 }}>
+                {rec.history.map((v, i) => (
+                  <div key={i} style={{ flex: 1, fontSize: 10, color: COLORS.inkSoft, textAlign: "center", fontVariantNumeric: "tabular-nums" }}>
+                    {v}%
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11, color: COLORS.inkSoft }}>
+                <span>Average: <strong style={{ color: COLORS.ink }}>{Math.round(rec.avg)}%</strong></span>
+                <span>Range: <strong style={{ color: COLORS.ink }}>{rec.min}–{rec.max}%</strong></span>
+              </div>
+            </div>
+
+            <p style={{ margin: 0, marginBottom: 12 }}>
+              This isn't about your work — {m.name} has been steady. We're just right-sizing so the unused funds can support new initiatives this year.
+            </p>
+            <p style={{ margin: 0, marginBottom: 12 }}>
+              Pastor V is happy to chat. Just reply to this email if you want to talk it through.
+            </p>
+            <p style={{ margin: 0, color: COLORS.inkSoft }}>— IRC Stewardship</p>
+          </div>
+        </div>
+
+        <div style={{ padding: "16px 24px", borderTop: `1px solid ${COLORS.border}`, backgroundColor: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10 }}>
+          <button onClick={onCancel} style={{ padding: "10px 18px", backgroundColor: "transparent", color: COLORS.inkSoft, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody }}>
+            Cancel
+          </button>
+          <button onClick={onApplyWithoutNotify} style={{ padding: "10px 18px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody }}>
+            Apply without notifying
+          </button>
+          <button onClick={onSendAndApply} style={{ padding: "10px 22px", backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 9, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6 }}>
+            <Mail size={14} /> Send & apply
+          </button>
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -1590,10 +1872,308 @@ const VarianceSection = ({ ministries }) => {
 };
 
 // ============================================================
+// QUARTERLY REVIEW BANNER — surfaces every 90 days at the top of Budget
+// ============================================================
+
+const QuarterlyReviewBanner = ({ ministries, updateMinistryBudget, logActivity, onScrollToRecs }) => {
+  const [state, setState] = useState("pending"); // pending | approved | snoozed
+
+  const recs = ministries.map((m) => ({ ministry: m, ...classifyMinistry(m) }));
+  const reduceRecs = recs.filter((c) => c.type === "reduce");
+  const increaseRecs = recs.filter((c) => c.type === "increase");
+  const totalToReview = reduceRecs.length + increaseRecs.length + recs.filter((c) => c.type === "volatile").length;
+
+  const approveAllReductions = () => {
+    for (const c of reduceRecs) {
+      if (c.suggestedBudget != null) {
+        updateMinistryBudget(c.ministry.id, c.suggestedBudget);
+        logActivity({
+          type: "budget",
+          ministry: c.ministry.name,
+          amount: c.delta,
+          note: `Annual budget reduced from ${fmt(c.ministry.budget)} to ${fmt(c.suggestedBudget)} via Q2 quarterly review`,
+        });
+      }
+    }
+    logActivity({
+      type: "review",
+      ministry: null,
+      note: `Q2 2026 quarterly review approved — ${reduceRecs.length} reduction${reduceRecs.length === 1 ? "" : "s"} applied via "Approve all"`,
+    });
+    setState("approved");
+  };
+
+  const snoozeReview = () => {
+    logActivity({
+      type: "review",
+      ministry: null,
+      note: "Q2 quarterly review snoozed — will reappear May 14, 2026",
+    });
+    setState("snoozed");
+  };
+
+  if (state === "approved") {
+    return (
+      <Card style={{ padding: 22, backgroundColor: "rgba(74,222,128,0.06)", borderColor: COLORS.green + "40", display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: COLORS.green, color: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Check size={20} strokeWidth={3} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 11, color: COLORS.green, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Q2 2026 review approved</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 17, fontWeight: 600, color: COLORS.ink, marginTop: 2 }}>
+            {reduceRecs.length} reduction{reduceRecs.length === 1 ? "" : "s"} applied · next review due Aug 1, 2026
+          </div>
+        </div>
+        <button onClick={() => setState("pending")} style={{ padding: "8px 14px", backgroundColor: "transparent", color: COLORS.inkSoft, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>
+          Reopen
+        </button>
+      </Card>
+    );
+  }
+
+  if (state === "snoozed") {
+    return (
+      <Card style={{ padding: 22, backgroundColor: "rgba(251,191,36,0.06)", borderColor: COLORS.amber + "40", display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: COLORS.amber, color: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Clock size={18} strokeWidth={2.5} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 11, color: COLORS.amber, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Q2 review snoozed</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 17, fontWeight: 600, color: COLORS.ink, marginTop: 2 }}>
+            Will reappear May 14, 2026
+          </div>
+        </div>
+        <button onClick={() => setState("pending")} style={{ padding: "8px 14px", backgroundColor: "transparent", color: COLORS.inkSoft, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>
+          Reopen now
+        </button>
+      </Card>
+    );
+  }
+
+  return (
+    <Card style={{ padding: 24, position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 4, backgroundColor: COLORS.copper }} />
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20 }}>
+        <div style={{ flex: 1 }}>
+          <Pill tone="copper">Q2 review · due this week</Pill>
+          <div style={{ fontFamily: fontSerif, fontSize: 26, fontWeight: 400, color: COLORS.ink, fontStyle: "italic", letterSpacing: -0.5, marginTop: 12, lineHeight: 1.2 }}>
+            {totalToReview} recommendations need your sign-off this quarter.
+          </div>
+          <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 6 }}>
+            {reduceRecs.length} reductions ({fmt(reduceRecs.reduce((s, c) => s + Math.max(0, -c.delta), 0))}/yr saved) ·{" "}
+            {increaseRecs.length} increase ·{" "}
+            {recs.filter((c) => c.type === "volatile").length} flagged for human review
+          </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, alignSelf: "center" }}>
+          <button onClick={approveAllReductions} style={{ padding: "11px 20px", backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 9, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+            <Check size={14} /> Approve all reductions
+          </button>
+          <button onClick={onScrollToRecs} style={{ padding: "11px 20px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody, whiteSpace: "nowrap" }}>
+            Review individually ↓
+          </button>
+          <button onClick={snoozeReview} style={{ padding: "8px 20px", backgroundColor: "transparent", color: COLORS.inkSoft, border: "none", borderRadius: 9, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody, textDecoration: "underline" }}>
+            Snooze 7 days
+          </button>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
+// ============================================================
+// WHAT-IF SCENARIO BUILDER — sliders that recompute totals live
+// ============================================================
+
+const WhatIfScenarioSection = ({ ministries, updateMinistryBudget, logActivity }) => {
+  const [drafts, setDrafts] = useState({});
+  const [savedCount, setSavedCount] = useState(0);
+
+  const projected = (m) => (drafts[m.id] !== undefined ? drafts[m.id] : m.budget);
+  const setDraft = (id, v) => setDrafts((d) => ({ ...d, [id]: v }));
+
+  const ministryTotal = ministries.reduce((s, m) => s + projected(m), 0);
+  const operatingTotal = OPERATING_OVERHEAD_YR + ministryTotal + EVENTS_BUDGET_YR + BLESSINGS_BUDGET_YR;
+  const surplus = DONATION_TARGET_YR - operatingTotal;
+  const survivalFloorMo = SURVIVAL_FLOOR_MO;
+  const runwayMonths = BALANCE_END / survivalFloorMo;
+
+  const hasChanges = Object.keys(drafts).length > 0 && ministries.some((m) => drafts[m.id] !== undefined && drafts[m.id] !== m.budget);
+
+  const reset = () => setDrafts({});
+  const apply = () => {
+    const changes = [];
+    for (const m of ministries) {
+      const draft = drafts[m.id];
+      if (draft !== undefined && draft !== m.budget) {
+        updateMinistryBudget(m.id, draft);
+        changes.push({ ministry: m, draft });
+      }
+    }
+    for (const ch of changes) {
+      logActivity({
+        type: "budget",
+        ministry: ch.ministry.name,
+        amount: ch.draft - ch.ministry.budget,
+        note: `Annual budget set to ${fmt(ch.draft)} via what-if scenario`,
+      });
+    }
+    if (changes.length > 0) {
+      logActivity({
+        type: "review",
+        ministry: null,
+        note: `What-if scenario applied — ${changes.length} ministry budget${changes.length === 1 ? "" : "s"} updated`,
+      });
+    }
+    setDrafts({});
+  };
+  const save = () => {
+    setSavedCount((s) => s + 1);
+    const changedCount = Object.keys(drafts).filter((id) => {
+      const m = ministries.find((mm) => mm.id === id);
+      return m && drafts[id] !== m.budget;
+    }).length;
+    logActivity({
+      type: "review",
+      ministry: null,
+      note: `What-if scenario saved (${changedCount} change${changedCount === 1 ? "" : "s"}) for later comparison`,
+    });
+  };
+
+  return (
+    <Card style={{ padding: 28 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18, gap: 16 }}>
+        <div>
+          <div style={{ fontFamily: fontSerif, fontSize: 30, fontWeight: 400, color: COLORS.ink, fontStyle: "italic", letterSpacing: -0.5 }}>
+            What if · scenario planning.
+          </div>
+          <div style={{ fontFamily: fontSerif, fontSize: 16, fontStyle: "italic", color: COLORS.inkSoft, marginTop: 4 }}>
+            Drag any ministry's slider — every total updates live.
+          </div>
+        </div>
+      </div>
+
+      {/* LIVE TOTALS */}
+      <div style={{
+        padding: 18, borderRadius: 12, marginBottom: 22,
+        backgroundColor: hasChanges ? "rgba(255,90,31,0.05)" : COLORS.cream,
+        border: `1px solid ${hasChanges ? COLORS.copper + "60" : COLORS.borderSoft}`,
+        display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 18,
+      }}>
+        <div>
+          <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Ministry total</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 600, color: COLORS.ink, marginTop: 4, letterSpacing: -0.5 }}>{fmtShort(ministryTotal)}</div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>{ministries.length} ministries</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Annual operating</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 600, color: COLORS.ink, marginTop: 4, letterSpacing: -0.5 }}>{fmtShort(operatingTotal)}</div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>incl. overhead + events</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Annual surplus</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 600, color: surplus >= 0 ? COLORS.green : COLORS.red, marginTop: 4, letterSpacing: -0.5 }}>
+            {surplus >= 0 ? "+" : ""}{fmtShort(surplus)}
+          </div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>vs. {fmtShort(DONATION_TARGET_YR)} target</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Cash runway</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 600, color: COLORS.ink, marginTop: 4, letterSpacing: -0.5 }}>{runwayMonths.toFixed(1)} mo</div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>on essentials only</div>
+        </div>
+      </div>
+
+      {/* MINISTRY SLIDERS */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {ministries.map((m) => {
+          const value = projected(m);
+          const delta = value - m.budget;
+          const min = Math.max(500, Math.floor(m.budget * 0.5 / 500) * 500);
+          const max = Math.ceil(m.budget * 1.5 / 500) * 500;
+          const changed = drafts[m.id] !== undefined && drafts[m.id] !== m.budget;
+          const direction = delta > 0 ? "increase" : delta < 0 ? "decrease" : "none";
+          const sliderColor = direction === "increase" ? COLORS.copper : direction === "decrease" ? COLORS.forest : COLORS.inkSoft;
+          return (
+            <div key={m.id} style={{
+              display: "grid", gridTemplateColumns: "180px 1fr 110px 110px",
+              alignItems: "center", gap: 14, padding: "8px 12px",
+              borderRadius: 8, backgroundColor: changed ? COLORS.cream : "transparent",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                <span style={{ fontSize: 14, color: m.color, fontFamily: fontDisplay, fontWeight: 600, flexShrink: 0 }}>{m.icon}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</span>
+              </div>
+              <input
+                type="range"
+                min={min}
+                max={max}
+                step={500}
+                value={value}
+                onChange={(e) => setDraft(m.id, Number(e.target.value))}
+                style={{
+                  width: "100%", accentColor: sliderColor, height: 4, cursor: "pointer",
+                }}
+              />
+              <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, fontVariantNumeric: "tabular-nums", textAlign: "right" }}>
+                {fmtShort(value)}
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 600, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                {direction === "none" ? (
+                  <span style={{ color: COLORS.inkSoft, fontStyle: "italic" }}>unchanged</span>
+                ) : (
+                  <span style={{ color: direction === "increase" ? COLORS.copper : COLORS.green }}>
+                    {delta > 0 ? "+" : ""}{fmt(delta)}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* FOOTER */}
+      <div style={{
+        marginTop: 18, paddingTop: 18, borderTop: `1px solid ${COLORS.border}`,
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+      }}>
+        <div style={{ fontSize: 12, color: COLORS.inkSoft }}>
+          {savedCount > 0 ? `${savedCount} scenario${savedCount === 1 ? "" : "s"} saved · ` : ""}
+          {hasChanges ? <span style={{ color: COLORS.copper, fontWeight: 700 }}>Unsaved changes</span> : "No changes yet"}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {hasChanges && (
+            <button onClick={reset} style={{ padding: "9px 16px", backgroundColor: "transparent", color: COLORS.inkSoft, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>
+              Reset all
+            </button>
+          )}
+          <button onClick={save} disabled={!hasChanges} style={{
+            padding: "9px 16px", backgroundColor: "transparent", color: hasChanges ? COLORS.ink : COLORS.inkSoft,
+            border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 12,
+            cursor: hasChanges ? "pointer" : "not-allowed", fontFamily: fontBody,
+          }}>
+            Save scenario
+          </button>
+          <button onClick={apply} disabled={!hasChanges} style={{
+            padding: "10px 20px", border: "none", borderRadius: 8,
+            backgroundColor: hasChanges ? COLORS.forest : COLORS.cream,
+            color: hasChanges ? COLORS.bg : COLORS.inkSoft,
+            fontWeight: 700, fontSize: 13, cursor: hasChanges ? "pointer" : "not-allowed",
+            fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <Check size={13} /> Apply to 2026 budget
+          </button>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
+// ============================================================
 // BUDGET PAGE
 // ============================================================
 
-const BudgetPage = ({ ministries, updateMinistryBudget }) => {
+const BudgetPage = ({ ministries, updateMinistryBudget, logActivity }) => {
   const [alerts, setAlerts] = useState({
     donationsBelowOverhead: true,
     ministryOverBudget: true,
@@ -1623,8 +2203,14 @@ const BudgetPage = ({ ministries, updateMinistryBudget }) => {
 
   const runway2026Worst = BALANCE_END / SURVIVAL_FLOOR_MO;
 
+  const recsRef = useRef(null);
+  const scrollToRecs = () => recsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
   return (
     <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 24 }}>
+
+      {/* QUARTERLY REVIEW BANNER */}
+      <QuarterlyReviewBanner ministries={ministries} updateMinistryBudget={updateMinistryBudget} logActivity={logActivity} onScrollToRecs={scrollToRecs} />
 
       {/* HERO SUMMARY */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
@@ -1653,13 +2239,18 @@ const BudgetPage = ({ ministries, updateMinistryBudget }) => {
       </div>
 
       {/* END-OF-MONTH RECONCILIATION */}
-      <ReconciliationSection ministries={ministries} />
+      <ReconciliationSection ministries={ministries} logActivity={logActivity} />
 
       {/* SMART RECOMMENDATIONS */}
-      <RecommendationsSection ministries={ministries} updateMinistryBudget={updateMinistryBudget} />
+      <div ref={recsRef}>
+        <RecommendationsSection ministries={ministries} updateMinistryBudget={updateMinistryBudget} logActivity={logActivity} />
+      </div>
 
       {/* VARIANCE STATS */}
       <VarianceSection ministries={ministries} />
+
+      {/* WHAT-IF SCENARIO BUILDER */}
+      <WhatIfScenarioSection ministries={ministries} updateMinistryBudget={updateMinistryBudget} logActivity={logActivity} />
 
       {/* MONTHLY OVERHEAD SETUP */}
       <Card style={{ padding: 28 }}>
@@ -2795,6 +3386,181 @@ const ReceiptsPage = ({ openReceiptModal }) => {
 };
 
 // ============================================================
+// ACTIVITY PAGE — audit trail of every decision
+// ============================================================
+
+const ACTIVITY_TYPES = {
+  roll:         { label: "Roll forward",  icon: ArrowUpRight,  color: COLORS.forest },
+  return:       { label: "Return to fund",icon: ArrowDownRight,color: COLORS.copper },
+  budget:       { label: "Budget change", icon: Edit3,          color: COLORS.amber },
+  notification: { label: "Notification",  icon: Mail,           color: COLORS.copper },
+  alert:        { label: "Alert fired",   icon: AlertTriangle,  color: COLORS.red },
+  review:       { label: "Quarterly review", icon: Check,       color: COLORS.green },
+};
+
+const FILTER_TABS = [
+  { id: "all",          label: "All",            types: null },
+  { id: "rolls",        label: "Rolls",          types: ["roll"] },
+  { id: "returns",      label: "Returns",        types: ["return"] },
+  { id: "budget",       label: "Budget changes", types: ["budget"] },
+  { id: "notifications",label: "Notifications",  types: ["notification"] },
+  { id: "reviews",      label: "Reviews",        types: ["review"] },
+  { id: "alerts",       label: "Alerts",         types: ["alert"] },
+];
+
+const formatDateLabel = (dateStr, todayStr) => {
+  const d = new Date(dateStr);
+  const today = new Date(todayStr);
+  const diffDays = Math.floor((today - d) / (1000 * 60 * 60 * 24));
+  const dayOfWeek = d.toLocaleDateString("en-US", { weekday: "long" });
+  const formatted = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  if (diffDays === 0) return `Today · ${formatted}`;
+  if (diffDays === 1) return `Yesterday · ${formatted}`;
+  if (diffDays < 7) return `${dayOfWeek} · ${formatted}`;
+  return formatted;
+};
+
+const formatTime = (dateStr) =>
+  new Date(dateStr).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+
+const ActivityPage = ({ activityLog }) => {
+  const [filter, setFilter] = useState("all");
+  const today = "2026-05-07T23:59:59"; // demo "now"
+
+  const tab = FILTER_TABS.find((t) => t.id === filter);
+  const visible = tab.types === null
+    ? activityLog
+    : activityLog.filter((e) => tab.types.includes(e.type));
+
+  // Group by date (YYYY-MM-DD)
+  const grouped = visible.reduce((acc, e) => {
+    const key = e.timestamp.split("T")[0];
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(e);
+    return acc;
+  }, {});
+  const dateKeys = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+  // Top stats
+  const totalRolled = activityLog.filter((e) => e.type === "roll").reduce((s, e) => s + e.amount, 0);
+  const totalReturned = activityLog.filter((e) => e.type === "return").reduce((s, e) => s + e.amount, 0);
+  const budgetChanges = activityLog.filter((e) => e.type === "budget").length;
+
+  return (
+    <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* TOP STATS */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+        <Card style={{ padding: 18 }}>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Total entries</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 26, fontWeight: 600, color: COLORS.ink, marginTop: 4 }}>{activityLog.length}</div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>last 7 days</div>
+        </Card>
+        <Card style={{ padding: 18 }}>
+          <div style={{ fontSize: 11, color: COLORS.green, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Rolled forward</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 26, fontWeight: 600, color: COLORS.ink, marginTop: 4 }}>{fmt(totalRolled)}</div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>{activityLog.filter((e) => e.type === "roll").length} ministries</div>
+        </Card>
+        <Card style={{ padding: 18 }}>
+          <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Returned to fund</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 26, fontWeight: 600, color: COLORS.ink, marginTop: 4 }}>{fmt(totalReturned)}</div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>{activityLog.filter((e) => e.type === "return").length} ministries</div>
+        </Card>
+        <Card style={{ padding: 18 }}>
+          <div style={{ fontSize: 11, color: COLORS.amber, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Budget changes</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 26, fontWeight: 600, color: COLORS.ink, marginTop: 4 }}>{budgetChanges}</div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>applied this period</div>
+        </Card>
+      </div>
+
+      {/* FILTER TABS + EXPORT */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {FILTER_TABS.map((t) => {
+            const count = t.types === null ? INITIAL_ACTIVITY_LOG.length : activityLog.filter((e) => t.types.includes(e.type)).length;
+            const active = filter === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setFilter(t.id)}
+                style={{
+                  padding: "8px 14px", border: active ? "none" : `1px solid ${COLORS.border}`,
+                  backgroundColor: active ? COLORS.forest : "transparent",
+                  color: active ? COLORS.bg : COLORS.ink,
+                  borderRadius: 8, fontSize: 12, fontWeight: 600, fontFamily: fontBody,
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+                }}
+              >
+                {t.label}
+                <span style={{
+                  padding: "1px 7px", borderRadius: 99, fontSize: 10, fontWeight: 700,
+                  backgroundColor: active ? "rgba(0,0,0,0.18)" : COLORS.cream,
+                  color: active ? COLORS.bg : COLORS.inkSoft,
+                }}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
+        <button style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.cream, color: COLORS.ink, border: `1px solid ${COLORS.border}`, padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
+          <Download size={13} /> Export CSV for board
+        </button>
+      </div>
+
+      {/* GROUPED FEED */}
+      {dateKeys.length === 0 ? (
+        <Card style={{ padding: 40, textAlign: "center" }}>
+          <div style={{ fontFamily: fontSerif, fontSize: 18, fontStyle: "italic", color: COLORS.inkSoft }}>No activity in this filter.</div>
+        </Card>
+      ) : (
+        dateKeys.map((dateKey) => (
+          <div key={dateKey}>
+            <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, marginBottom: 10 }}>
+              {formatDateLabel(dateKey, today)}
+            </div>
+            <Card style={{ padding: 0, overflow: "hidden" }}>
+              {grouped[dateKey].map((e, i) => {
+                const meta = ACTIVITY_TYPES[e.type];
+                const Icon = meta.icon;
+                const isLast = i === grouped[dateKey].length - 1;
+                return (
+                  <div key={e.id} style={{
+                    display: "grid", gridTemplateColumns: "44px 1fr 130px 90px",
+                    gap: 14, alignItems: "center", padding: "14px 18px",
+                    borderBottom: isLast ? "none" : `1px solid ${COLORS.borderSoft}`,
+                  }}>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: 8,
+                      backgroundColor: meta.color + "20", color: meta.color,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <Icon size={15} />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>
+                        <span style={{ color: COLORS.inkSoft }}>{e.who}</span> · <span style={{ color: meta.color }}>{meta.label.toLowerCase()}</span>{e.ministry ? ` · ${e.ministry}` : ""}
+                      </div>
+                      <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>{e.note}</div>
+                    </div>
+                    <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums",
+                      color: e.amount > 0 ? COLORS.green : e.amount < 0 ? COLORS.copper : COLORS.inkSoft,
+                    }}>
+                      {e.amount === 0 ? "—" : `${e.amount > 0 ? "+" : "−"}${fmt(Math.abs(e.amount))}`}
+                    </div>
+                    <div style={{ fontSize: 11, color: COLORS.inkSoft, fontVariantNumeric: "tabular-nums", textAlign: "right" }}>
+                      {formatTime(e.timestamp)}
+                    </div>
+                  </div>
+                );
+              })}
+            </Card>
+          </div>
+        ))
+      )}
+    </div>
+  );
+};
+
+// ============================================================
 // PEOPLE / PERMISSIONS PAGE
 // ============================================================
 
@@ -2911,125 +3677,350 @@ const PeoplePage = () => {
 // INTEGRATIONS PAGE
 // ============================================================
 
+const INTEGRATIONS = [
+  {
+    name: "Stripe", logo: "S", color: "#635BFF",
+    desc: "Online giving via website & mobile. Auto-imports donations every 15 min.",
+    fields: [
+      { key: "secretKey", label: "Secret API key", placeholder: "sk_live_…", type: "password", required: true, help: "Dashboard → Developers → API keys" },
+      { key: "webhookSecret", label: "Webhook signing secret", placeholder: "whsec_…", type: "password", required: false, help: "Developers → Webhooks → Signing secret" },
+    ],
+    perms: ["Read all charges", "Read customer info", "Webhook on charge.succeeded"],
+  },
+  {
+    name: "Square", logo: "■", color: "#000000",
+    desc: "In-person giving via Square readers. Sun & Fri service offerings.",
+    fields: [
+      { key: "accessToken", label: "Access token", placeholder: "EAAAEx…", type: "password", required: true, help: "Developer Dashboard → Credentials → Access tokens" },
+      { key: "locationId", label: "Location ID", placeholder: "L8X09F2…", type: "text", required: true, help: "Account & Settings → Business → Locations" },
+    ],
+    perms: ["Read payments", "Read locations", "Read items (offerings)"],
+  },
+  {
+    name: "QuickBooks Online", logo: "Q", color: "#2CA01C",
+    desc: "Two-way accounting sync. Donations → income, receipts → expenses, classes per ministry.",
+    fields: [
+      { key: "companyId", label: "Company / Realm ID", placeholder: "1234567890", type: "text", required: true, help: "Settings → Account & Settings → Billing → Company ID" },
+      { key: "clientId", label: "OAuth Client ID", placeholder: "ABxxx…", type: "text", required: true },
+      { key: "clientSecret", label: "OAuth Client Secret", placeholder: "•••", type: "password", required: true },
+    ],
+    perms: ["Read & write accounts", "Manage classes (ministries)", "Manage customers (donors)"],
+  },
+  {
+    name: "Google Workspace", logo: "G", color: "#4285F4",
+    desc: "Single sign-on for ministry leaders. Calendar sync for events & camps.",
+    fields: [
+      { key: "domain", label: "Workspace domain", placeholder: "ircchurch.org", type: "text", required: true },
+      { key: "serviceAccount", label: "Service account email", placeholder: "irc-steward@…iam.gserviceaccount.com", type: "text", required: true, help: "Google Cloud Console → IAM & Admin → Service accounts" },
+    ],
+    perms: ["Read user directory", "Read calendar events"],
+  },
+  {
+    name: "Mailchimp", logo: "M", color: "#FFE01B",
+    desc: "Auto-segment donors for thank-you emails, year-end giving statements.",
+    fields: [
+      { key: "apiKey", label: "API key", placeholder: "abc123…-us21", type: "password", required: true, help: "Account → Extras → API keys. Datacenter is the suffix after the dash." },
+      { key: "audienceId", label: "Audience ID", placeholder: "a1b2c3d4e5", type: "text", required: true, help: "Audience → Settings → Audience name and defaults" },
+    ],
+    perms: ["Read & manage subscribers", "Send campaigns"],
+  },
+  {
+    name: "Planning Center", logo: "P", color: "#4099FF",
+    desc: "Sync member directory, attendance, and check-in for kids ministry.",
+    fields: [
+      { key: "appId", label: "Application ID", placeholder: "…", type: "text", required: true, help: "api.planningcenteronline.com → Personal Access Tokens" },
+      { key: "secret", label: "Secret", placeholder: "•••", type: "password", required: true },
+    ],
+    perms: ["Read people", "Read check-ins"],
+  },
+];
+
+const ConnectionModal = ({ integration, existing, onConnect, onClose }) => {
+  const [values, setValues] = useState(existing || {});
+  const [reveal, setReveal] = useState({});
+
+  const requiredOk = integration.fields
+    .filter((f) => f.required)
+    .every((f) => (values[f.key] ?? "").trim().length > 0);
+
+  const submit = () => {
+    if (!requiredOk) return;
+    onConnect(integration, values);
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(10,10,10,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20 }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        backgroundColor: COLORS.surface, borderRadius: 16, width: 540, maxWidth: "100%", maxHeight: "90vh",
+        display: "flex", flexDirection: "column", boxShadow: "0 25px 80px rgba(0,0,0,0.6)",
+        border: `1px solid ${COLORS.border}`,
+      }}>
+
+        <div style={{ padding: "24px 28px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 11, backgroundColor: integration.color,
+              color: integration.color === "#FFE01B" ? "#000" : "#fff",
+              display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 20,
+            }}>{integration.logo}</div>
+            <div>
+              <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 600, color: COLORS.ink, letterSpacing: -0.3 }}>
+                Connect {integration.name}
+              </div>
+              <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>{integration.desc}</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}>
+            <X size={18} color={COLORS.inkSoft} />
+          </button>
+        </div>
+
+        <div style={{ padding: 24, overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 14 }}>
+
+          <div style={{ padding: 12, backgroundColor: COLORS.cream, borderRadius: 9, fontSize: 11, color: COLORS.inkSoft, display: "flex", alignItems: "flex-start", gap: 8, lineHeight: 1.5 }}>
+            <Lock size={13} color={COLORS.green} style={{ flexShrink: 0, marginTop: 1 }} />
+            <span>Credentials are stored encrypted server-side and never shown again after save. Demo: this prototype keeps them in browser state only.</span>
+          </div>
+
+          {integration.fields.map((field) => {
+            const isPassword = field.type === "password";
+            const isRevealed = reveal[field.key];
+            return (
+              <div key={field.key}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+                  <label style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>
+                    {field.label} {field.required && <span style={{ color: COLORS.copper }}>*</span>}
+                  </label>
+                  {isPassword && (values[field.key] ?? "").length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setReveal((r) => ({ ...r, [field.key]: !r[field.key] }))}
+                      style={{ background: "transparent", border: "none", color: COLORS.copper, fontSize: 10, fontFamily: fontBody, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, cursor: "pointer" }}
+                    >
+                      {isRevealed ? "Hide" : "Show"}
+                    </button>
+                  )}
+                </div>
+                <input
+                  type={isPassword && !isRevealed ? "password" : "text"}
+                  placeholder={field.placeholder}
+                  value={values[field.key] ?? ""}
+                  onChange={(e) => setValues((v) => ({ ...v, [field.key]: e.target.value }))}
+                  style={{
+                    width: "100%", padding: "10px 12px", fontSize: 13,
+                    fontFamily: isPassword ? "ui-monospace, monospace" : fontBody,
+                    color: COLORS.ink, background: COLORS.bg,
+                    border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                />
+                {field.help && (
+                  <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 4, fontStyle: "italic" }}>
+                    {field.help}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {integration.perms.length > 0 && (
+            <div style={{ padding: 12, border: `1px solid ${COLORS.border}`, borderRadius: 9, marginTop: 4 }}>
+              <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, marginBottom: 6 }}>
+                Permissions this connection grants
+              </div>
+              {integration.perms.map((p, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: COLORS.ink, padding: "3px 0" }}>
+                  <Check size={12} color={COLORS.green} /> {p}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: "18px 24px", borderTop: `1px solid ${COLORS.border}`, backgroundColor: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10 }}>
+          <button onClick={onClose} style={{ padding: "10px 18px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody }}>
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={!requiredOk}
+            style={{
+              padding: "10px 22px", border: "none", borderRadius: 9,
+              fontWeight: 700, fontSize: 13, fontFamily: fontBody,
+              cursor: requiredOk ? "pointer" : "not-allowed",
+              backgroundColor: requiredOk ? COLORS.forest : COLORS.cream,
+              color: requiredOk ? COLORS.bg : COLORS.inkSoft,
+              display: "flex", alignItems: "center", gap: 6,
+            }}
+          >
+            <Link2 size={13} /> {existing ? "Update credentials" : "Connect"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const IntegrationsPage = () => {
-  const integrations = [
-    {
-      name: "Stripe", logo: "S", color: "#635BFF", connected: true,
-      desc: "Online giving via website & mobile. Auto-imports donations every 15 min.",
-      stats: { synced: "4,287 donations YTD", lastSync: "2 min ago", amount: fmt(1124400) },
-      perms: ["Read all charges", "Read customer info", "Webhook on charge.succeeded"],
-    },
-    {
-      name: "Square", logo: "■", color: "#000000", connected: true,
-      desc: "In-person giving via Square readers. Sun & Fri service offerings.",
-      stats: { synced: "2,104 transactions", lastSync: "8 min ago", amount: fmt(583200) },
-      perms: ["Read payments", "Read locations (3)", "Read items (offerings)"],
-    },
-    {
-      name: "QuickBooks Online", logo: "Q", color: "#2CA01C", connected: true,
-      desc: "Two-way accounting sync. Donations → income, receipts → expenses, classes per ministry.",
-      stats: { synced: "8,924 records", lastSync: "1h ago", amount: "67 unsynced" },
-      perms: ["Read & write accounts", "Manage classes (ministries)", "Manage customers (donors)"],
-    },
-    {
-      name: "Google Workspace", logo: "G", color: "#4285F4", connected: false,
-      desc: "Single sign-on for ministry leaders. Calendar sync for events & camps.",
-      stats: null, perms: [],
-    },
-    {
-      name: "Mailchimp", logo: "M", color: "#FFE01B", connected: false,
-      desc: "Auto-segment donors for thank-you emails, year-end giving statements.",
-      stats: null, perms: [],
-    },
-    {
-      name: "Planning Center", logo: "P", color: "#4099FF", connected: false,
-      desc: "Sync member directory, attendance, and check-in for kids ministry.",
-      stats: null, perms: [],
-    },
-  ];
+  // connections: { [integrationName]: { credentials, connectedAt, lastSync } }
+  const [connections, setConnections] = useState({});
+  const [editing, setEditing] = useState(null);
+
+  const connect = (integration, credentials) => {
+    setConnections((c) => ({
+      ...c,
+      [integration.name]: {
+        credentials,
+        connectedAt: new Date(),
+        lastSync: new Date(),
+      },
+    }));
+    setEditing(null);
+  };
+
+  const disconnect = (integration) => {
+    if (!confirm(`Disconnect ${integration.name}? Stored credentials will be cleared.`)) return;
+    setConnections((c) => {
+      const next = { ...c };
+      delete next[integration.name];
+      return next;
+    });
+  };
+
+  const sync = (integration) => {
+    setConnections((c) => ({
+      ...c,
+      [integration.name]: { ...c[integration.name], lastSync: new Date() },
+    }));
+  };
+
+  const totalConnected = Object.keys(connections).length;
+  const formatRelative = (d) => {
+    const sec = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (sec < 60) return `${sec}s ago`;
+    if (sec < 3600) return `${Math.floor(sec / 60)} min ago`;
+    if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+    return `${Math.floor(sec / 86400)}d ago`;
+  };
 
   return (
     <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 20 }}>
-      <Card style={{ padding: 24, backgroundColor: COLORS.cream, border: `1px solid ${COLORS.copperSoft}` }}>
+
+      <Card style={{ padding: 24, backgroundColor: COLORS.cream, borderColor: COLORS.copper + "40" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: COLORS.copper, color: COLORS.forestDeep, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: COLORS.copper, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Sparkles size={22} />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 500, color: COLORS.ink, fontStyle: "italic" }}>Everything connected, everything automated.</div>
-            <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 4 }}>Square + Stripe push donations in. QuickBooks gets the books. Your team gets time back.</div>
+            <div style={{ fontFamily: fontSerif, fontSize: 22, fontWeight: 400, color: COLORS.ink, fontStyle: "italic" }}>
+              {totalConnected === 0
+                ? "Nothing connected yet — pick one to start."
+                : `${totalConnected} of ${INTEGRATIONS.length} connected.`}
+            </div>
+            <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 4 }}>
+              Click Connect on any tile, paste your credentials, and we'll start syncing.
+            </div>
           </div>
         </div>
       </Card>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
-        {integrations.map((int, i) => (
-          <Card key={i} style={{ padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 14 }}>
-              <div style={{
-                width: 48, height: 48, borderRadius: 12, backgroundColor: int.color,
-                color: int.color === "#FFE01B" ? "#000" : "#fff",
-                display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 22,
-              }}>{int.logo}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                  <div style={{ fontFamily: fontDisplay, fontSize: 19, fontWeight: 600, color: COLORS.ink }}>{int.name}</div>
-                  {int.connected ? (
-                    <Pill tone="success"><span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: COLORS.green, marginRight: 2 }} /> Connected</Pill>
-                  ) : (
-                    <Pill tone="neutral">Not connected</Pill>
-                  )}
-                </div>
-                <div style={{ fontSize: 13, color: COLORS.inkSoft, lineHeight: 1.5 }}>{int.desc}</div>
-              </div>
-            </div>
+        {INTEGRATIONS.map((int) => {
+          const conn = connections[int.name];
+          const isConnected = !!conn;
 
-            {int.connected && int.stats && (
-              <div style={{ padding: 14, backgroundColor: COLORS.bg, borderRadius: 10, marginBottom: 12 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 12 }}>
-                  <div>
-                    <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Last sync</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink, marginTop: 2 }}>{int.stats.lastSync}</div>
+          return (
+            <Card key={int.name} style={{ padding: 24 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 14 }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: 12, backgroundColor: int.color,
+                  color: int.color === "#FFE01B" ? "#000" : "#fff",
+                  display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 22, flexShrink: 0,
+                }}>{int.logo}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4, flexWrap: "wrap" }}>
+                    <div style={{ fontFamily: fontDisplay, fontSize: 19, fontWeight: 600, color: COLORS.ink }}>{int.name}</div>
+                    {isConnected ? (
+                      <Pill tone="success">
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: COLORS.green, marginRight: 4, boxShadow: `0 0 0 3px ${COLORS.green}30` }} />
+                        Connected
+                      </Pill>
+                    ) : (
+                      <Pill tone="neutral">Not connected</Pill>
+                    )}
                   </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Records</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink, marginTop: 2 }}>{int.stats.synced}</div>
+                  <div style={{ fontSize: 13, color: COLORS.inkSoft, lineHeight: 1.5 }}>{int.desc}</div>
+                </div>
+              </div>
+
+              {isConnected ? (
+                <div style={{ padding: 14, backgroundColor: COLORS.bg, borderRadius: 10, marginBottom: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Last sync</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink, marginTop: 2 }}>{formatRelative(conn.lastSync)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Connected</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink, marginTop: 2 }}>{formatRelative(conn.connectedAt)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Status</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.green, marginTop: 2 }}>● Live</div>
+                    </div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>YTD</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink, marginTop: 2 }}>{int.stats.amount}</div>
+                  <div style={{ fontSize: 11, color: COLORS.inkSoft, lineHeight: 1.7 }}>
+                    <div style={{ fontWeight: 700, marginBottom: 4, color: COLORS.ink, textTransform: "uppercase", letterSpacing: 0.4 }}>Permissions granted</div>
+                    {int.perms.map((p, j) => (
+                      <div key={j} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <Lock size={10} color={COLORS.green} /> {p}
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <div style={{ fontSize: 11, color: COLORS.inkSoft, lineHeight: 1.7 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 4, color: COLORS.ink, textTransform: "uppercase", letterSpacing: 0.4 }}>Permissions granted</div>
-                  {int.perms.map((p, j) => (
-                    <div key={j} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <Lock size={10} color={COLORS.green} /> {p}
+              ) : (
+                <div style={{ padding: 14, backgroundColor: COLORS.bg, borderRadius: 10, marginBottom: 12, fontSize: 11, color: COLORS.inkSoft, lineHeight: 1.7 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 4, color: COLORS.ink, textTransform: "uppercase", letterSpacing: 0.4 }}>You'll need</div>
+                  {int.fields.map((f, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ color: COLORS.copper }}>•</span> {f.label}{f.required && <span style={{ color: COLORS.copper }}>*</span>}
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-
-            <div style={{ display: "flex", gap: 8 }}>
-              {int.connected ? (
-                <>
-                  <button style={{ flex: 1, padding: "9px 14px", backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                    <RefreshCw size={12} /> Sync now
-                  </button>
-                  <button style={{ padding: "9px 14px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>
-                    Configure
-                  </button>
-                </>
-              ) : (
-                <button style={{ flex: 1, padding: "10px 14px", backgroundColor: COLORS.copper, color: COLORS.forestDeep, border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                  <Link2 size={13} /> Connect {int.name}
-                </button>
               )}
-            </div>
-          </Card>
-        ))}
+
+              <div style={{ display: "flex", gap: 8 }}>
+                {isConnected ? (
+                  <>
+                    <button onClick={() => sync(int)} style={{ flex: 1, padding: "9px 14px", backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                      <RefreshCw size={12} /> Sync now
+                    </button>
+                    <button onClick={() => setEditing(int)} style={{ padding: "9px 14px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>
+                      Update
+                    </button>
+                    <button onClick={() => disconnect(int)} style={{ padding: "9px 14px", backgroundColor: "transparent", color: COLORS.red, border: `1px solid ${COLORS.red}40`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>
+                      Disconnect
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={() => setEditing(int)} style={{ flex: 1, padding: "10px 14px", backgroundColor: COLORS.copper, color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                    <Link2 size={13} /> Connect {int.name}
+                  </button>
+                )}
+              </div>
+            </Card>
+          );
+        })}
       </div>
+
+      {editing && (
+        <ConnectionModal
+          integration={editing}
+          existing={connections[editing.name]?.credentials}
+          onConnect={connect}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
   );
 };
@@ -3226,6 +4217,23 @@ export default function IRCChurchApp() {
     setMinistries((prev) => [...prev, ministry]);
     return uniqueId;
   };
+  // Audit trail: every Roll/Return/Apply/Approve/Snooze appends one entry.
+  // Activity page reads from this; nothing is mutated except via logActivity.
+  const [activityLog, setActivityLog] = useState(INITIAL_ACTIVITY_LOG);
+  const logActivity = (entry) => {
+    setActivityLog((prev) => [
+      {
+        id: (prev[0]?.id ?? 100) + 1,
+        who: "Elena Volkov",
+        ministry: null,
+        amount: 0,
+        timestamp: new Date().toISOString(),
+        ...entry,
+      },
+      ...prev,
+    ]);
+  };
+
   const renameAdmin = (id, name) =>
     setAdmins((prev) => prev.map((a) => (a.id === id ? { ...a, name } : a)));
   const updateAdminTitle = (id, title) =>
@@ -3249,6 +4257,7 @@ export default function IRCChurchApp() {
     administrators: { t: "Administrators", s: "Who oversees what — budgets that update as you reassign" },
     events: { t: "Events & Camps", s: "23 events · 3,901 attendees" },
     receipts: { t: "Receipts", s: "Snap, classify, sync — automatically" },
+    activity: { t: "Activity", s: "Audit trail · every roll, return, budget change, and alert" },
     people: { t: "People & Roles", s: "Manage who can see and do what" },
     integrations: { t: "Integrations", s: "Stripe · Square · QuickBooks · and more" },
     reports: { t: "Reports", s: "Generate any report in one click" },
@@ -3260,7 +4269,7 @@ export default function IRCChurchApp() {
       case "dashboard": return <DashboardPage ministries={ministries} />;
       case "donations": return <DonationsPage />;
       case "expenses": return <ExpensesPage />;
-      case "budget": return <BudgetPage ministries={ministries} updateMinistryBudget={updateMinistryBudget} />;
+      case "budget": return <BudgetPage ministries={ministries} updateMinistryBudget={updateMinistryBudget} logActivity={logActivity} />;
       case "ministries": return <MinistriesPage openReceiptModal={open} ministries={ministries} addMinistry={addMinistry} />;
       case "campuses": return <CampusesPage />;
       case "administrators": return <AdministratorsPage
@@ -3270,12 +4279,13 @@ export default function IRCChurchApp() {
       />;
       case "events": return <EventsPage />;
       case "receipts": return <ReceiptsPage openReceiptModal={open} />;
+      case "activity": return <ActivityPage activityLog={activityLog} />;
       case "people": return <PeoplePage />;
       case "integrations": return <IntegrationsPage />;
       case "reports": return <ReportsPage />;
       default: return <DashboardPage ministries={ministries} />;
     }
-  }, [activePage, ministries, admins]);
+  }, [activePage, ministries, admins, activityLog]);
 
   return (
     <div style={{
