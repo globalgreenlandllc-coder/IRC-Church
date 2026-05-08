@@ -7,12 +7,14 @@ import {
   CreditCard, Banknote, Shield, UserPlus, Mail, MoreVertical, Eye,
   Edit3, Trash2, ChevronRight, Camera, Paperclip, X, Check, Lock,
   Sparkles, Activity, Church, MapPin, BarChart3, PieChart as PieIcon,
-  RefreshCw, Link2, ExternalLink, Globe
+  RefreshCw, Link2, ExternalLink, Globe, Target, Gauge, AlertTriangle, Zap,
+  Flame, BellRing, Info
 } from "lucide-react";
 import {
   ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
   Tooltip, AreaChart, Area, LineChart, Line, CartesianGrid, Legend
 } from "recharts";
+import { RULES as ALERT_RULES, evaluate as evaluateAlerts, buildContext as buildAlertContext, SEVERITY, DEFAULT_CONFIG as ALERT_DEFAULT_CONFIG } from "./lib/alerts.js";
 
 // ============================================================
 // DESIGN TOKENS
@@ -120,6 +122,24 @@ const TEAM = [
   { name: "Marcus Tate", email: "marcus@ircchurch.org", role: "Tacoma Campus Pastor", access: "Campus Admin", avatar: "MT", lastActive: "30m ago", campus: "Tacoma" },
 ];
 
+const ADMINISTRATORS = [
+  { id: "vlad", name: "Pastor Vladimir", avatar: "PV", type: "executive", campus: "All", title: "Senior Pastor", bio: "Vision, preaching, and pastoral care across all campuses." },
+  { id: "anna", name: "Anna Kovalenko", avatar: "AK", type: "function", campus: "Main", title: "Creative Arts Director", bio: "Oversees worship, sound, video, lighting, and media production." },
+  { id: "maria", name: "Maria Rojas", avatar: "MR", type: "function", campus: "Main", title: "Family & Next Gen", bio: "Children, teens, and young adults — full discipleship pipeline." },
+  { id: "olga", name: "Olga Smirnova", avatar: "OS", type: "function", campus: "Main", title: "Care & Outreach", bio: "Single moms, deaf community, and target outreach initiatives." },
+  { id: "elena", name: "Elena Volkov", avatar: "EV", type: "function", campus: "All", title: "Finance & Operations", bio: "Books, payroll, vendor relations, and the merch table." },
+  { id: "marcus", name: "Marcus Tate", avatar: "MT", type: "campus", campus: "Tacoma", title: "Tacoma Campus Pastor", bio: "Launching Tacoma — building local ministry infrastructure." },
+  { id: "james", name: "James Chen", avatar: "JC", type: "campus", campus: "New York", title: "NY Campus Pastor", bio: "Stewarding the New York launch — gathering, preaching, and care." },
+];
+
+const INITIAL_ASSIGNMENTS = {
+  worship: "anna", technical: "anna", video: "anna", "light-screen": "anna", media: "anna",
+  kids: "maria", teens: "maria", youth: "maria",
+  "single-mom": "olga", deaf: "olga", target: "olga",
+  legacy: "vlad", services: "vlad",
+  merch: "elena",
+};
+
 const RECENT_RECEIPTS = [
   { id: 1, ministry: "Worship", vendor: "Sweetwater Audio", amount: 1284.50, date: "2025-12-28", status: "synced", uploadedBy: "Anna K." },
   { id: 2, ministry: "Kids Ministry", vendor: "Costco", amount: 487.22, date: "2025-12-27", status: "pending", uploadedBy: "Maria R." },
@@ -150,6 +170,57 @@ const TOTAL_EXPENSES = 1657771.59;
 const TOTAL_SAVINGS = 224930.74;
 const BALANCE_START = 702050.10;
 const BALANCE_END = 926980.84;
+
+// ============================================================
+// BUDGET PLAN — derived from 2025 actuals + 5% buffer, Safe Haven loan removed
+// ============================================================
+
+const MONTHLY_OVERHEAD = {
+  facilities: [
+    { name: "Rent (Main campus)", amount: 20000, essential: true },
+    { name: "Property insurance", amount: 4500, essential: true },
+    { name: "Utilities (gas, electric, water)", amount: 7500, essential: true },
+    { name: "Internet & phone", amount: 1576, essential: true },
+  ],
+  people: [
+    { name: "Payroll (15 staff)", amount: 31000, essential: true },
+    { name: "Payroll taxes & benefits", amount: 4835, essential: true },
+  ],
+  operations: [
+    { name: "Software & subscriptions", amount: 2800, essential: false },
+    { name: "Banking & merchant fees", amount: 1400, essential: false },
+    { name: "D&O / liability insurance", amount: 1500, essential: false },
+    { name: "Accounting & legal", amount: 2400, essential: false },
+    { name: "Office supplies", amount: 600, essential: false },
+    { name: "Misc admin", amount: 1500, essential: false },
+  ],
+};
+
+const flatten = (cats) => Object.values(cats).flat();
+const SURVIVAL_FLOOR_MO = flatten(MONTHLY_OVERHEAD).filter(l => l.essential).reduce((s, l) => s + l.amount, 0);
+const OPERATING_OVERHEAD_MO = flatten(MONTHLY_OVERHEAD).reduce((s, l) => s + l.amount, 0);
+const OPERATING_OVERHEAD_YR = OPERATING_OVERHEAD_MO * 12;
+
+const MINISTRIES_BUDGET_YR = 231500;
+const EVENTS_BUDGET_YR = 130000;
+const BLESSINGS_BUDGET_YR = 45000;
+
+const OPERATING_BUDGET_YR = OPERATING_OVERHEAD_YR + MINISTRIES_BUDGET_YR + EVENTS_BUDGET_YR + BLESSINGS_BUDGET_YR;
+const DONATION_TARGET_YR = 1980000;
+const PLANNED_SURPLUS_YR = DONATION_TARGET_YR - OPERATING_BUDGET_YR;
+
+const DONATION_TIERS = [
+  { name: "Survival", target: SURVIVAL_FLOOR_MO * 12, desc: "Keeps the doors open. Bare essentials only.", color: COLORS.red },
+  { name: "Operating", target: OPERATING_BUDGET_YR, desc: "Full ministry calendar at planned scale.", color: COLORS.amber },
+  { name: "Vision", target: DONATION_TARGET_YR, desc: "Operating + savings + new initiatives.", color: COLORS.green },
+];
+
+const STRESS_SCENARIOS = [
+  { name: "Baseline", drop: 0, projected: DONATION_TARGET_YR },
+  { name: "−10% downturn", drop: 0.10, projected: DONATION_TARGET_YR * 0.90 },
+  { name: "−25% recession", drop: 0.25, projected: DONATION_TARGET_YR * 0.75 },
+  { name: "−50% crisis", drop: 0.50, projected: DONATION_TARGET_YR * 0.50 },
+];
 
 const fmt = (n) => "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtShort = (n) => {
@@ -183,6 +254,69 @@ const Pill = ({ children, tone = "neutral" }) => {
   );
 };
 
+// Click-to-edit text. Enter saves, Esc cancels, blur saves.
+// Renders as plain text until clicked; swaps to <input> inline.
+// Pass `as="number"` for numeric editing.
+const EditableText = ({ value, onChange, placeholder, as = "text", style = {}, hoverHint = true, format }) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(value ?? ""));
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        type={as === "number" ? "number" : "text"}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+        onBlur={() => {
+          onChange(as === "number" ? Number(draft) : draft);
+          setEditing(false);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { onChange(as === "number" ? Number(draft) : draft); setEditing(false); }
+          if (e.key === "Escape") { setDraft(String(value ?? "")); setEditing(false); }
+        }}
+        style={{
+          ...style,
+          background: COLORS.surface,
+          border: `1px solid ${COLORS.copper}`,
+          borderRadius: 4,
+          padding: "2px 6px",
+          outline: "none",
+          fontFamily: style.fontFamily || fontBody,
+          width: as === "number" ? 90 : "100%",
+          minWidth: 80,
+          boxSizing: "border-box",
+        }}
+      />
+    );
+  }
+
+  const display = value === "" || value == null
+    ? <span style={{ color: COLORS.inkSoft, fontStyle: "italic" }}>{placeholder || "—"}</span>
+    : (format ? format(value) : value);
+
+  return (
+    <span
+      onClick={(e) => { e.stopPropagation(); setDraft(String(value ?? "")); setEditing(true); }}
+      style={{
+        ...style,
+        cursor: "text",
+        padding: "2px 6px",
+        borderRadius: 4,
+        transition: "background 0.1s",
+        display: "inline-block",
+      }}
+      onMouseEnter={(e) => { if (hoverHint) e.currentTarget.style.background = COLORS.cream; }}
+      onMouseLeave={(e) => { if (hoverHint) e.currentTarget.style.background = "transparent"; }}
+      title="Click to edit"
+    >
+      {display}
+    </span>
+  );
+};
+
 const Card = ({ children, style = {}, className = "" }) => (
   <div className={className} style={{
     backgroundColor: COLORS.surface,
@@ -203,8 +337,10 @@ const Sidebar = ({ activePage, setActivePage }) => {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "donations", label: "Donations", icon: HandHeart },
     { id: "expenses", label: "Expenses", icon: Receipt },
+    { id: "budget", label: "Budget", icon: Target },
     { id: "ministries", label: "Ministries", icon: Users },
     { id: "campuses", label: "Campuses", icon: Building2 },
+    { id: "administrators", label: "Administrators", icon: UserPlus },
     { id: "events", label: "Events & Camps", icon: Calendar },
     { id: "receipts", label: "Receipts", icon: Paperclip },
     { id: "people", label: "People & Roles", icon: Shield },
@@ -358,6 +494,106 @@ const TopBar = ({ activeCampus, setActiveCampus, pageTitle, pageSubtitle }) => {
 };
 
 // ============================================================
+// BUDGET HEALTH HERO CARD (Dashboard top)
+// ============================================================
+
+const BudgetHealthCard = () => {
+  const currentDonations = MONTHLY_TREND[MONTHLY_TREND.length - 1].donations;
+  const currentExpenses = MONTHLY_TREND[MONTHLY_TREND.length - 1].expenses;
+  const monthlyBudget = OPERATING_BUDGET_YR / 12;
+  const cashOnHand = BALANCE_END;
+
+  const overheadCoverage = currentDonations / OPERATING_OVERHEAD_MO;
+  const surplusOverOverhead = currentDonations - OPERATING_OVERHEAD_MO;
+  const runwayMonths = cashOnHand / SURVIVAL_FLOOR_MO;
+
+  const donationsOK = currentDonations >= monthlyBudget * 0.85;
+  const overheadOK = currentDonations >= OPERATING_OVERHEAD_MO;
+  const runwayOK = runwayMonths >= 6;
+  const passing = [donationsOK, overheadOK, runwayOK].filter(Boolean).length;
+  const status = passing === 3 ? "on-track" : passing === 2 ? "caution" : "at-risk";
+
+  const cfg = {
+    "on-track": { label: "On Track", color: COLORS.green, bg: "#DDEDE0", accent: COLORS.green },
+    "caution": { label: "Caution", color: COLORS.amber, bg: "#FBE8D0", accent: COLORS.amber },
+    "at-risk": { label: "At Risk", color: COLORS.red, bg: "#F4D9D5", accent: COLORS.red },
+  }[status];
+
+  const headline = status === "on-track"
+    ? `On pace to cover overhead with ${fmtShort(surplusOverOverhead)} to spare this month.`
+    : status === "caution"
+    ? `Watching donations closely — ${fmtShort(surplusOverOverhead)} above overhead so far.`
+    : `Overhead at risk — donations trailing target this month.`;
+
+  const metrics = [
+    {
+      label: "Donations pace",
+      value: fmtShort(currentDonations),
+      sub: `${Math.round((currentDonations / monthlyBudget) * 100)}% of monthly budget`,
+      ok: donationsOK,
+    },
+    {
+      label: "Expenses pace",
+      value: fmtShort(currentExpenses),
+      sub: `${Math.round((currentExpenses / monthlyBudget) * 100)}% of monthly budget`,
+      ok: currentExpenses <= monthlyBudget * 1.15,
+    },
+    {
+      label: "Overhead coverage",
+      value: `${overheadCoverage.toFixed(1)}×`,
+      sub: `${fmtShort(OPERATING_OVERHEAD_MO)}/mo target`,
+      ok: overheadOK,
+    },
+    {
+      label: "Cash runway",
+      value: `${runwayMonths.toFixed(1)} mo`,
+      sub: `On essentials only (${fmtShort(SURVIVAL_FLOOR_MO)}/mo)`,
+      ok: runwayOK,
+    },
+  ];
+
+  return (
+    <Card style={{
+      padding: 28, position: "relative", overflow: "hidden",
+      background: `linear-gradient(135deg, ${COLORS.surface} 0%, ${cfg.bg}80 100%)`,
+      borderColor: cfg.accent + "40",
+    }}>
+      <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 4, backgroundColor: cfg.accent }} />
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+            <Gauge size={18} color={cfg.accent} strokeWidth={2} />
+            <span style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 600 }}>Budget Health</span>
+            <Pill tone={status === "on-track" ? "success" : status === "caution" ? "warn" : "danger"}>
+              {cfg.label}
+            </Pill>
+          </div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 500, color: COLORS.ink, fontStyle: "italic", letterSpacing: -0.5, lineHeight: 1.2, maxWidth: 720 }}>
+            {headline}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginTop: 8 }}>
+        {metrics.map((m, i) => (
+          <div key={i} style={{
+            padding: 14, backgroundColor: COLORS.surface, borderRadius: 10,
+            border: `1px solid ${COLORS.border}`,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: m.ok ? COLORS.green : COLORS.amber }} />
+              <span style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>{m.label}</span>
+            </div>
+            <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 500, color: COLORS.ink, letterSpacing: -0.5 }}>{m.value}</div>
+            <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>{m.sub}</div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+};
+
+// ============================================================
 // DASHBOARD PAGE
 // ============================================================
 
@@ -371,6 +607,7 @@ const DashboardPage = () => {
 
   return (
     <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 24 }}>
+      <BudgetHealthCard />
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
         {kpis.map((k, i) => {
@@ -719,6 +956,470 @@ const ExpensesPage = () => {
 };
 
 // ============================================================
+// ALERTS LIVE EVALUATION PANEL
+// ============================================================
+
+const ALERT_ICONS = { TrendingDown, AlertTriangle, Receipt, Flame };
+
+const SEVERITY_TONE = {
+  critical: { color: COLORS.red, bg: "#F4D9D5", label: "Critical" },
+  warning: { color: COLORS.amber, bg: "#FBE8D0", label: "Warning" },
+  info: { color: COLORS.copper, bg: "#E8C9A8", label: "Info" },
+};
+
+const ThresholdsPanel = ({ config, alerts, updateThreshold }) => {
+  return (
+    <div style={{ marginTop: 18, paddingTop: 18, borderTop: `1px solid ${COLORS.border}` }}>
+      <div style={{ marginBottom: 12 }}>
+        <span style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Thresholds</span>
+        <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>
+          Tune when each alert fires — changes recompute the live evaluation below.
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+        {Object.values(ALERT_RULES).map((rule) => {
+          const t = rule.tunable;
+          const stored = config[rule.id]?.[t.key] ?? t.fromUi(t.default);
+          const uiValue = t.toUi(stored);
+          const enabled = !!alerts[rule.id];
+          return (
+            <div key={rule.id} style={{
+              padding: 14, border: `1px solid ${COLORS.border}`, borderRadius: 10,
+              backgroundColor: enabled ? COLORS.surface : COLORS.bg,
+              opacity: enabled ? 1 : 0.55,
+              display: "flex", alignItems: "center", gap: 12,
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.ink }}>{rule.title}</div>
+                <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>{t.label}</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="number"
+                  value={uiValue}
+                  min={t.min}
+                  max={t.max}
+                  step={t.step}
+                  disabled={!enabled}
+                  onChange={(e) => updateThreshold(rule.id, t.key, Number(e.target.value))}
+                  style={{
+                    width: 64, padding: "6px 8px", fontSize: 13, fontWeight: 600,
+                    fontFamily: fontBody, color: COLORS.ink, border: `1px solid ${COLORS.border}`,
+                    borderRadius: 6, textAlign: "right", outline: "none",
+                    backgroundColor: enabled ? COLORS.surface : COLORS.bg,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                />
+                <span style={{ fontSize: 11, color: COLORS.inkSoft, fontWeight: 600, minWidth: 80 }}>{t.unit}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const AlertsLivePanel = ({ alerts, config }) => {
+  const ctx = buildAlertContext({
+    monthlyTrend: MONTHLY_TREND,
+    ministries: MINISTRIES,
+    receipts: RECENT_RECEIPTS,
+    cashOnHand: BALANCE_END,
+    operatingOverheadMo: OPERATING_OVERHEAD_MO,
+    survivalFloorMo: SURVIVAL_FLOOR_MO,
+    now: new Date("2025-12-31T23:59:59"),
+  });
+  const results = evaluateAlerts(ctx, alerts, config);
+  const firingCount = results.filter((r) => r.evaluated && r.triggered).length;
+
+  return (
+    <div style={{ marginTop: 18, paddingTop: 18, borderTop: `1px solid ${COLORS.border}` }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Evaluation right now</span>
+            {firingCount > 0 ? (
+              <Pill tone="danger">{firingCount} firing</Pill>
+            ) : (
+              <Pill tone="success">All clear</Pill>
+            )}
+          </div>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>
+            Each rule evaluated against current data — same logic the cron job will run.
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {results.map(({ rule, enabled, evaluated, triggered, headline, detail }) => {
+          const Icon = ALERT_ICONS[rule.icon] || Info;
+          const tone = SEVERITY_TONE[rule.severity];
+          const muted = !enabled;
+          const accent = !enabled ? COLORS.border : triggered ? tone.color : COLORS.green;
+          return (
+            <div key={rule.id} style={{
+              padding: 14, borderRadius: 10, border: `1px solid ${accent}40`,
+              backgroundColor: muted ? COLORS.bg : triggered ? tone.bg + "60" : COLORS.surface,
+              display: "flex", alignItems: "flex-start", gap: 12, opacity: muted ? 0.55 : 1,
+            }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+                backgroundColor: muted ? COLORS.border : triggered ? tone.color : "#DDEDE0",
+                color: muted ? COLORS.inkSoft : triggered ? "#fff" : COLORS.green,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                {muted ? <X size={14} /> : triggered ? <Icon size={14} /> : <Check size={14} />}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{rule.title}</span>
+                  {muted ? (
+                    <Pill tone="neutral">Off</Pill>
+                  ) : triggered ? (
+                    <Pill tone={rule.severity === "critical" ? "danger" : rule.severity === "warning" ? "warn" : "copper"}>
+                      Firing
+                    </Pill>
+                  ) : (
+                    <Pill tone="success">OK</Pill>
+                  )}
+                </div>
+                <div style={{ fontSize: 12, color: COLORS.ink, fontWeight: 500 }}>
+                  {muted ? rule.description : headline}
+                </div>
+                {!muted && detail && (
+                  <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 4, lineHeight: 1.5 }}>
+                    {detail}
+                  </div>
+                )}
+                {!muted && (
+                  <div style={{ fontSize: 10, color: COLORS.inkSoft, marginTop: 6, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>
+                    Recipients: {rule.recipients.join(" · ")}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// BUDGET PAGE
+// ============================================================
+
+const BudgetPage = () => {
+  const [alerts, setAlerts] = useState({
+    donationsBelowOverhead: true,
+    ministryOverBudget: true,
+    receiptsMissing: true,
+    runwayBelow6: true,
+  });
+  const [alertConfig, setAlertConfig] = useState(ALERT_DEFAULT_CONFIG);
+
+  const updateThreshold = (ruleId, key, uiValue) => {
+    const rule = ALERT_RULES[ruleId];
+    const stored = rule.tunable.fromUi(uiValue);
+    setAlertConfig((c) => ({ ...c, [ruleId]: { ...c[ruleId], [key]: stored } }));
+  };
+
+  const sections = [
+    { key: "facilities", label: "Facilities", icon: Building2, items: MONTHLY_OVERHEAD.facilities },
+    { key: "people", label: "People", icon: Users, items: MONTHLY_OVERHEAD.people },
+    { key: "operations", label: "Operations", icon: Activity, items: MONTHLY_OVERHEAD.operations },
+  ];
+
+  const fullBudget = [
+    { name: "Operating overhead", amount: OPERATING_OVERHEAD_YR, color: COLORS.forest, desc: "Rent, payroll, utilities, ops" },
+    { name: "Ministries", amount: MINISTRIES_BUDGET_YR, color: COLORS.copper, desc: "All 14 active ministries" },
+    { name: "Events & camps", amount: EVENTS_BUDGET_YR, color: COLORS.green, desc: "Net of registration revenue" },
+    { name: "Blessings & care", amount: BLESSINGS_BUDGET_YR, color: COLORS.amber, desc: "Pastor's, ministers', guests'" },
+  ];
+
+  const runway2026Worst = BALANCE_END / SURVIVAL_FLOOR_MO;
+
+  return (
+    <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 24 }}>
+
+      {/* HERO SUMMARY */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+        <Card style={{ padding: 22 }}>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>2026 Donation Target</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 500, color: COLORS.ink, marginTop: 6, letterSpacing: -0.5 }}>{fmtShort(DONATION_TARGET_YR)}</div>
+          <div style={{ fontSize: 12, color: COLORS.green, marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
+            <ArrowUpRight size={12} /> +5% vs. 2025
+          </div>
+        </Card>
+        <Card style={{ padding: 22 }}>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Operating Budget</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 500, color: COLORS.ink, marginTop: 6, letterSpacing: -0.5 }}>{fmtShort(OPERATING_BUDGET_YR)}</div>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>{Math.round((OPERATING_BUDGET_YR / DONATION_TARGET_YR) * 100)}% of target</div>
+        </Card>
+        <Card style={{ padding: 22 }}>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Planned Surplus</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 500, color: COLORS.green, marginTop: 6, letterSpacing: -0.5 }}>{fmtShort(PLANNED_SURPLUS_YR)}</div>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>Reserve + new initiatives</div>
+        </Card>
+        <Card style={{ padding: 22, backgroundColor: COLORS.cream, borderColor: COLORS.copperSoft }}>
+          <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Min. Monthly Overhead</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 500, color: COLORS.ink, marginTop: 6, letterSpacing: -0.5 }}>{fmtShort(OPERATING_OVERHEAD_MO)}</div>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>Survival floor: {fmtShort(SURVIVAL_FLOOR_MO)}</div>
+        </Card>
+      </div>
+
+      {/* MONTHLY OVERHEAD SETUP */}
+      <Card style={{ padding: 28 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
+          <div>
+            <div style={{ fontFamily: fontDisplay, fontSize: 24, fontWeight: 500, color: COLORS.ink, fontStyle: "italic", letterSpacing: -0.5 }}>Monthly minimum overhead</div>
+            <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 2 }}>The number every alert references. Mark each line essential or operational.</div>
+          </div>
+          <div style={{ display: "flex", gap: 12, fontSize: 11 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: COLORS.red }} />
+              <span style={{ color: COLORS.inkSoft, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.3 }}>Essential</span>
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: COLORS.amber }} />
+              <span style={{ color: COLORS.inkSoft, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.3 }}>Operational</span>
+            </span>
+          </div>
+        </div>
+
+        <div style={{ padding: 14, backgroundColor: COLORS.cream, borderRadius: 10, marginBottom: 20, display: "flex", alignItems: "flex-start", gap: 12 }}>
+          <Sparkles size={18} color={COLORS.copper} style={{ flexShrink: 0, marginTop: 2 }} />
+          <div style={{ fontSize: 12, color: COLORS.ink, lineHeight: 1.6 }}>
+            <strong>Smart suggestion.</strong> These figures are derived from your 2025 actuals: payroll & taxes ($430k), facilities ($403k), with the Safe Haven loan removed (paid off Dec 2025) and a 5% inflation buffer. Adjust any line below — every alert and dashboard color updates instantly.
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+          {sections.map((sec) => {
+            const Icon = sec.icon;
+            const subtotal = sec.items.reduce((s, l) => s + l.amount, 0);
+            return (
+              <div key={sec.key} style={{ border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 18 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: COLORS.cream, color: COLORS.forest, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Icon size={16} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>{sec.label}</div>
+                    <div style={{ fontSize: 11, color: COLORS.inkSoft }}>{fmtShort(subtotal)}/mo</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {sec.items.map((item, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 7, backgroundColor: COLORS.bg }}>
+                      <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: item.essential ? COLORS.red : COLORS.amber, flexShrink: 0 }} />
+                      <span style={{ flex: 1, fontSize: 12, color: COLORS.ink, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</span>
+                      <span style={{ fontSize: 12, color: COLORS.ink, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtShort(item.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginTop: 18 }}>
+          <div style={{ padding: 18, borderRadius: 12, border: `1px solid ${COLORS.red}30`, backgroundColor: "#F4D9D540" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <Flame size={14} color={COLORS.red} />
+              <div style={{ fontSize: 11, color: COLORS.red, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Survival Floor</div>
+            </div>
+            <div style={{ fontFamily: fontDisplay, fontSize: 30, fontWeight: 500, color: COLORS.ink, letterSpacing: -0.7 }}>{fmtShort(SURVIVAL_FLOOR_MO)}<span style={{ fontSize: 16, color: COLORS.inkSoft, fontWeight: 400 }}>/mo</span></div>
+            <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 4 }}>If everything else stops — facilities + people only.</div>
+          </div>
+          <div style={{ padding: 18, borderRadius: 12, border: `1px solid ${COLORS.amber}30`, backgroundColor: "#FBE8D040" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <Gauge size={14} color={COLORS.amber} />
+              <div style={{ fontSize: 11, color: COLORS.amber, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Operating Overhead</div>
+            </div>
+            <div style={{ fontFamily: fontDisplay, fontSize: 30, fontWeight: 500, color: COLORS.ink, letterSpacing: -0.7 }}>{fmtShort(OPERATING_OVERHEAD_MO)}<span style={{ fontSize: 16, color: COLORS.inkSoft, fontWeight: 400 }}>/mo</span></div>
+            <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 4 }}>Full overhead at planned operating scale.</div>
+          </div>
+        </div>
+      </Card>
+
+      {/* FULL OPERATING BUDGET */}
+      <Card style={{ padding: 28 }}>
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 500, color: COLORS.ink, fontStyle: "italic" }}>Full operating budget, 2026</div>
+          <div style={{ fontSize: 13, color: COLORS.inkSoft }}>Every dollar planned · {fmt(OPERATING_BUDGET_YR)} total</div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {fullBudget.map((b, i) => {
+            const pct = (b.amount / OPERATING_BUDGET_YR) * 100;
+            return (
+              <div key={i} style={{ padding: 16, backgroundColor: COLORS.bg, borderRadius: 10, display: "grid", gridTemplateColumns: "260px 1fr 130px 70px", gap: 18, alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink, display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: b.color }} />
+                    {b.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2, marginLeft: 18 }}>{b.desc}</div>
+                </div>
+                <div style={{ height: 8, backgroundColor: COLORS.cream, borderRadius: 99, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${pct}%`, backgroundColor: b.color, borderRadius: 99 }} />
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, fontVariantNumeric: "tabular-nums", textAlign: "right" }}>{fmtShort(b.amount)}</div>
+                <div style={{ fontSize: 12, color: COLORS.inkSoft, textAlign: "right" }}>{pct.toFixed(1)}%</div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ marginTop: 14, padding: 14, backgroundColor: COLORS.forestDeep, color: COLORS.cream, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <TrendingDown size={16} color={COLORS.copper} />
+            <div style={{ fontSize: 13 }}>vs. 2025 actual ({fmt(TOTAL_EXPENSES)}) — projecting</div>
+          </div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 500, color: COLORS.copper }}>
+            {fmtShort(TOTAL_EXPENSES - OPERATING_BUDGET_YR)} less in 2026
+          </div>
+        </div>
+      </Card>
+
+      {/* DONATION TARGETS — TIERS */}
+      <Card style={{ padding: 28 }}>
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 500, color: COLORS.ink, fontStyle: "italic" }}>Donation targets</div>
+          <div style={{ fontSize: 13, color: COLORS.inkSoft }}>Three tiers — clear goals at every level</div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+          {DONATION_TIERS.map((t, i) => {
+            const monthly = t.target / 12;
+            return (
+              <div key={i} style={{ padding: 22, borderRadius: 12, border: `1px solid ${t.color}40`, backgroundColor: t.color + "08", position: "relative", overflow: "hidden" }}>
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, backgroundColor: t.color }} />
+                <div style={{ fontSize: 11, color: t.color, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700, marginTop: 6 }}>{t.name}</div>
+                <div style={{ fontFamily: fontDisplay, fontSize: 30, fontWeight: 500, color: COLORS.ink, marginTop: 6, letterSpacing: -0.7 }}>{fmtShort(t.target)}</div>
+                <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>{fmtShort(monthly)}/mo · annual</div>
+                <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 12, lineHeight: 1.6 }}>{t.desc}</div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* STRESS TEST */}
+      <Card style={{ padding: 28 }}>
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 500, color: COLORS.ink, fontStyle: "italic" }}>Stress test</div>
+          <div style={{ fontSize: 13, color: COLORS.inkSoft }}>What happens if donations drop? The math, instantly.</div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {STRESS_SCENARIOS.map((s, i) => {
+            const gap = s.projected - OPERATING_BUDGET_YR;
+            const survives = s.projected >= SURVIVAL_FLOOR_MO * 12;
+            const advice = gap >= 0
+              ? "Full operating plan covered."
+              : gap >= -(MINISTRIES_BUDGET_YR + EVENTS_BUDGET_YR)
+              ? "Cut events + ministries. Keep overhead intact."
+              : survives
+              ? "Cut all but essentials. Tap reserves for staff."
+              : "Below survival floor. Reserves required.";
+            const tone = gap >= 0 ? COLORS.green : survives ? COLORS.amber : COLORS.red;
+            return (
+              <div key={i} style={{ padding: 16, backgroundColor: COLORS.bg, borderRadius: 10, display: "grid", gridTemplateColumns: "180px 140px 140px 1fr 120px", gap: 18, alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink }}>{s.name}</div>
+                  {s.drop > 0 && <div style={{ fontSize: 11, color: COLORS.inkSoft }}>−{Math.round(s.drop * 100)}% giving</div>}
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.3, fontWeight: 600 }}>Projected</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, fontVariantNumeric: "tabular-nums" }}>{fmtShort(s.projected)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.3, fontWeight: 600 }}>vs. budget</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: gap >= 0 ? COLORS.green : COLORS.red, fontVariantNumeric: "tabular-nums" }}>
+                    {gap >= 0 ? "+" : ""}{fmtShort(gap)}
+                  </div>
+                </div>
+                <div style={{ fontSize: 13, color: COLORS.ink }}>{advice}</div>
+                <div>
+                  <Pill tone={gap >= 0 ? "success" : survives ? "warn" : "danger"}>
+                    {gap >= 0 ? "Healthy" : survives ? "Trim" : "Crisis"}
+                  </Pill>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ marginTop: 16, padding: 18, backgroundColor: COLORS.forestDeep, color: COLORS.cream, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <AlertTriangle size={20} color={COLORS.copper} />
+            <div>
+              <div style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 500, fontStyle: "italic" }}>Worst-case runway</div>
+              <div style={{ fontSize: 12, color: "rgba(244,236,220,0.7)" }}>If giving stopped tomorrow and you ran on essentials only.</div>
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontFamily: fontDisplay, fontSize: 32, fontWeight: 500, color: COLORS.copper, letterSpacing: -0.7 }}>{runway2026Worst.toFixed(1)} months</div>
+            <div style={{ fontSize: 11, color: "rgba(244,236,220,0.6)" }}>{fmt(BALANCE_END)} reserves ÷ {fmtShort(SURVIVAL_FLOOR_MO)}/mo</div>
+          </div>
+        </div>
+      </Card>
+
+      {/* SMART ALERTS */}
+      <Card style={{ padding: 28 }}>
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 500, color: COLORS.ink, fontStyle: "italic" }}>Smart alerts</div>
+          <div style={{ fontSize: 13, color: COLORS.inkSoft }}>Get notified the moment something needs your attention</div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {[
+            { key: "donationsBelowOverhead", icon: TrendingDown, title: "Donations trending below overhead", desc: "Warn if monthly giving falls under operating overhead for 2 weeks running.", tone: COLORS.red },
+            { key: "ministryOverBudget", icon: AlertTriangle, title: "Ministry exceeds budget", desc: "Notify the leader and finance admin when a ministry passes 95% of its annual budget.", tone: COLORS.amber },
+            { key: "receiptsMissing", icon: Receipt, title: "Receipts missing 7+ days", desc: "Remind ministry leaders to upload receipts for any approved spending older than a week.", tone: COLORS.copper },
+            { key: "runwayBelow6", icon: Flame, title: "Cash runway drops below 6 months", desc: "Critical alert to the senior pastor and treasurer when reserves can't cover 6 months of essentials.", tone: COLORS.red },
+          ].map((a) => {
+            const Icon = a.icon;
+            const on = alerts[a.key];
+            return (
+              <div key={a.key} style={{ padding: 16, border: `1px solid ${COLORS.border}`, borderRadius: 10, display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 9, backgroundColor: a.tone + "15", color: a.tone, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Icon size={16} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>{a.title}</div>
+                  <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>{a.desc}</div>
+                </div>
+                <button
+                  onClick={() => setAlerts({ ...alerts, [a.key]: !on })}
+                  style={{
+                    width: 44, height: 24, borderRadius: 12, border: "none", cursor: "pointer",
+                    backgroundColor: on ? COLORS.forest : COLORS.border, position: "relative", transition: "background 0.15s",
+                  }}
+                  aria-label={`Toggle ${a.title}`}
+                >
+                  <span style={{
+                    position: "absolute", top: 2, left: on ? 22 : 2, width: 20, height: 20, borderRadius: "50%",
+                    backgroundColor: COLORS.surface, transition: "left 0.15s",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                  }} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ marginTop: 14, padding: 12, backgroundColor: COLORS.bg, borderRadius: 8, display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: COLORS.inkSoft }}>
+          <Info size={14} />
+          Alerts deliver via email + push. Configure recipients in <strong style={{ color: COLORS.ink }}>People & Roles</strong>.
+        </div>
+
+        <ThresholdsPanel config={alertConfig} alerts={alerts} updateThreshold={updateThreshold} />
+
+        <AlertsLivePanel alerts={alerts} config={alertConfig} />
+      </Card>
+
+    </div>
+  );
+};
+
+// ============================================================
 // MINISTRIES PAGE
 // ============================================================
 
@@ -835,6 +1536,506 @@ const CampusesPage = () => {
           </Card>
         );
       })}
+    </div>
+  );
+};
+
+// ============================================================
+// ADMINISTRATORS PAGE
+// ============================================================
+
+const ADMIN_TYPE_TONE = {
+  executive: { color: COLORS.forest, bg: "#DDEDE0", label: "Executive" },
+  function: { color: COLORS.copper, bg: "#E8C9A8", label: "Function" },
+  campus: { color: COLORS.amber, bg: "#FBE8D0", label: "Campus" },
+};
+
+// Computes per-admin totals from current assignments.
+const computeOversight = (adminId, assignments, ministriesList) => {
+  const ministries = ministriesList.filter((m) => assignments[m.id] === adminId);
+  const budget = ministries.reduce((s, m) => s + m.budget, 0);
+  const spent = ministries.reduce((s, m) => s + m.spent, 0);
+  return { ministries, budget, spent };
+};
+
+const NEW_MINISTRY_PALETTE = ["#1F3A34", "#2D6A4F", "#52796F", "#84A98C", "#B8855E", "#C97B2F", "#D4A373", "#9B7B5A", "#A98467"];
+const NEW_MINISTRY_ICONS = ["○", "◆", "▲", "■", "♦", "★", "✦", "◈", "◇"];
+
+const slugify = (s) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `m-${Date.now()}`;
+
+const AssignmentModal = ({ admin, assignments, ministries, renameMinistry, updateMinistryBudget, addMinistry, onSave, onClose }) => {
+  const initialOwned = new Set(
+    Object.entries(assignments).filter(([, aid]) => aid === admin.id).map(([mid]) => mid)
+  );
+  const [selected, setSelected] = useState(initialOwned);
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newBudgetInput, setNewBudgetInput] = useState("");
+
+  const toggle = (mid) => {
+    const next = new Set(selected);
+    if (next.has(mid)) next.delete(mid);
+    else next.add(mid);
+    setSelected(next);
+  };
+
+  const handleAddMinistry = () => {
+    const name = newName.trim();
+    const budget = Number(newBudgetInput);
+    if (!name || !budget || budget <= 0) return;
+    const newId = addMinistry({ name, budget });
+    setSelected((prev) => new Set([...prev, newId]));
+    setNewName("");
+    setNewBudgetInput("");
+    setAdding(false);
+  };
+
+  const newBudget = ministries.filter((m) => selected.has(m.id)).reduce((s, m) => s + m.budget, 0);
+  const transfersIn = [...selected].filter((mid) => assignments[mid] && assignments[mid] !== admin.id).length;
+  const willLose = [...initialOwned].filter((mid) => !selected.has(mid));
+
+  return (
+    <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(21,39,36,0.55)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20 }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: COLORS.surface, borderRadius: 16, width: 880, maxWidth: "100%", maxHeight: "90vh", display: "flex", flexDirection: "column", boxShadow: "0 25px 80px rgba(21,39,36,0.3)" }}>
+
+        <div style={{ padding: "24px 28px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 44, height: 44, borderRadius: "50%", backgroundColor: COLORS.forest, color: COLORS.cream, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>{admin.avatar}</div>
+            <div>
+              <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 500, color: COLORS.ink, fontStyle: "italic", letterSpacing: -0.3 }}>Assign ministries to {admin.name}</div>
+              <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>Click any ministry to toggle. Selecting one already assigned transfers it.</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}>
+            <X size={20} color={COLORS.inkSoft} />
+          </button>
+        </div>
+
+        <div style={{ padding: 24, overflowY: "auto", flex: 1 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+            {ministries.map((m) => {
+              const isSelected = selected.has(m.id);
+              const currentOwner = assignments[m.id];
+              const owner = ADMINISTRATORS.concat([]).find((a) => a.id === currentOwner);
+              const isOurs = currentOwner === admin.id;
+              const isOther = currentOwner && !isOurs;
+              const isUnassigned = !currentOwner;
+
+              const borderColor = isSelected ? COLORS.green : isOther ? COLORS.amber : COLORS.border;
+              const bg = isSelected ? "#DDEDE040" : isOther ? "#FBE8D040" : COLORS.surface;
+
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => toggle(m.id)}
+                  role="button"
+                  tabIndex={0}
+                  style={{
+                    padding: 14, border: `2px solid ${borderColor}`, borderRadius: 10,
+                    backgroundColor: bg, textAlign: "left", cursor: "pointer", fontFamily: fontBody,
+                    display: "flex", flexDirection: "column", gap: 8, transition: "all 0.12s",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 7, backgroundColor: m.color + "20", color: m.color, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fontDisplay, fontSize: 16, fontWeight: 600, flexShrink: 0 }}>{m.icon}</div>
+                      <EditableText
+                        value={m.name}
+                        onChange={(v) => renameMinistry(m.id, v)}
+                        style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink, fontFamily: fontBody }}
+                      />
+                    </div>
+                    {isSelected && (
+                      <div style={{ width: 22, height: 22, borderRadius: "50%", backgroundColor: COLORS.green, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <Check size={13} strokeWidth={3} />
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11, color: COLORS.inkSoft, display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                    <EditableText
+                      value={m.budget}
+                      as="number"
+                      onChange={(v) => updateMinistryBudget(m.id, v)}
+                      format={(n) => fmtShort(n)}
+                      style={{ fontSize: 11, color: COLORS.inkSoft, fontWeight: 600, fontFamily: fontBody }}
+                    />
+                    <span>budget · led by {m.leader || "—"}</span>
+                  </div>
+                  {isOther && !isSelected && (
+                    <div style={{ fontSize: 10, color: COLORS.amber, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                      Currently under {owner?.avatar || "?"} · click to transfer
+                    </div>
+                  )}
+                  {isOther && isSelected && (
+                    <div style={{ fontSize: 10, color: COLORS.green, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                      Will transfer from {owner?.avatar || "?"}
+                    </div>
+                  )}
+                  {isUnassigned && !isSelected && (
+                    <div style={{ fontSize: 10, color: COLORS.inkSoft, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                      Unassigned
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* + NEW MINISTRY TILE */}
+            {!adding ? (
+              <button
+                onClick={() => setAdding(true)}
+                style={{
+                  padding: 14, border: `2px dashed ${COLORS.copper}80`, borderRadius: 10,
+                  backgroundColor: COLORS.cream + "40", textAlign: "left", cursor: "pointer",
+                  fontFamily: fontBody, display: "flex", flexDirection: "column", alignItems: "center",
+                  justifyContent: "center", gap: 6, color: COLORS.copper, minHeight: 110,
+                }}
+              >
+                <Plus size={20} />
+                <span style={{ fontSize: 13, fontWeight: 700 }}>New ministry</span>
+                <span style={{ fontSize: 11, color: COLORS.inkSoft, fontWeight: 500 }}>auto-assigned to {admin.avatar}</span>
+              </button>
+            ) : (
+              <div style={{
+                padding: 14, border: `2px solid ${COLORS.copper}`, borderRadius: 10,
+                backgroundColor: COLORS.surface, display: "flex", flexDirection: "column", gap: 10,
+              }}>
+                <div style={{ fontSize: 11, color: COLORS.copper, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }}>New ministry</div>
+                <input
+                  autoFocus
+                  placeholder="Ministry name"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAddMinistry(); if (e.key === "Escape") setAdding(false); }}
+                  style={{ fontSize: 13, fontWeight: 600, fontFamily: fontBody, padding: "7px 9px", border: `1px solid ${COLORS.border}`, borderRadius: 6, outline: "none" }}
+                />
+                <input
+                  type="number"
+                  placeholder="Annual budget ($)"
+                  value={newBudgetInput}
+                  onChange={(e) => setNewBudgetInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAddMinistry(); if (e.key === "Escape") setAdding(false); }}
+                  style={{ fontSize: 13, fontFamily: fontBody, padding: "7px 9px", border: `1px solid ${COLORS.border}`, borderRadius: 6, outline: "none" }}
+                />
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    onClick={handleAddMinistry}
+                    disabled={!newName.trim() || !Number(newBudgetInput)}
+                    style={{
+                      flex: 1, padding: "7px 10px", border: "none", borderRadius: 6, fontFamily: fontBody, fontWeight: 700,
+                      fontSize: 12, cursor: newName.trim() && Number(newBudgetInput) ? "pointer" : "not-allowed",
+                      backgroundColor: newName.trim() && Number(newBudgetInput) ? COLORS.forest : COLORS.border,
+                      color: COLORS.cream,
+                    }}
+                  >
+                    Add
+                  </button>
+                  <button
+                    onClick={() => { setAdding(false); setNewName(""); setNewBudgetInput(""); }}
+                    style={{ padding: "7px 10px", border: `1px solid ${COLORS.border}`, borderRadius: 6, fontFamily: fontBody, fontWeight: 600, fontSize: 12, cursor: "pointer", backgroundColor: "transparent", color: COLORS.ink }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div style={{ padding: "18px 24px", borderTop: `1px solid ${COLORS.border}`, backgroundColor: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.5 }}>
+            <div><strong style={{ color: COLORS.ink }}>New oversight:</strong> {selected.size} ministr{selected.size === 1 ? "y" : "ies"} · {fmt(newBudget)}</div>
+            {transfersIn > 0 && <div>{transfersIn} ministr{transfersIn === 1 ? "y" : "ies"} will transfer in from other admins.</div>}
+            {willLose.length > 0 && <div>{willLose.length} ministr{willLose.length === 1 ? "y" : "ies"} will become unassigned.</div>}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={onClose} style={{ padding: "10px 18px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody }}>
+              Cancel
+            </button>
+            <button onClick={() => { onSave(selected); onClose(); }} style={{ padding: "10px 20px", backgroundColor: COLORS.forest, color: COLORS.cream, border: "none", borderRadius: 9, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6 }}>
+              <Check size={14} /> Save assignments
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const AdministratorsPage = () => {
+  const [assignments, setAssignments] = useState(INITIAL_ASSIGNMENTS);
+  const [filter, setFilter] = useState("all");
+  const [editing, setEditing] = useState(null);
+  const [ministries, setMinistries] = useState(MINISTRIES);
+  const [admins, setAdmins] = useState(ADMINISTRATORS);
+
+  // Keep `editing` reference in sync if its admin object changes (after rename).
+  const editingAdmin = editing ? admins.find((a) => a.id === editing.id) : null;
+
+  const renameMinistry = (id, name) => {
+    setMinistries((prev) => prev.map((m) => (m.id === id ? { ...m, name } : m)));
+  };
+  const updateMinistryBudget = (id, budget) => {
+    setMinistries((prev) => prev.map((m) => (m.id === id ? { ...m, budget } : m)));
+  };
+  const addMinistry = ({ name, budget }) => {
+    const id = slugify(name);
+    let uniqueId = id;
+    let i = 2;
+    while (ministries.some((m) => m.id === uniqueId)) uniqueId = `${id}-${i++}`;
+    const idx = ministries.length;
+    const ministry = {
+      id: uniqueId,
+      name,
+      budget,
+      spent: 0,
+      leader: "",
+      campus: "main",
+      color: NEW_MINISTRY_PALETTE[idx % NEW_MINISTRY_PALETTE.length],
+      icon: NEW_MINISTRY_ICONS[idx % NEW_MINISTRY_ICONS.length],
+    };
+    setMinistries((prev) => [...prev, ministry]);
+    return uniqueId;
+  };
+
+  const renameAdmin = (id, name) => {
+    setAdmins((prev) => prev.map((a) => (a.id === id ? { ...a, name } : a)));
+  };
+  const updateAdminTitle = (id, title) => {
+    setAdmins((prev) => prev.map((a) => (a.id === id ? { ...a, title } : a)));
+  };
+  const addAdmin = () => {
+    const id = `admin-${Date.now()}`;
+    const newAdmin = {
+      id,
+      name: "New Administrator",
+      avatar: "NA",
+      type: "function",
+      campus: "Main",
+      title: "Click title to edit",
+      bio: "Click any name to rename.",
+    };
+    setAdmins((prev) => [...prev, newAdmin]);
+  };
+
+  const stats = useMemo(() => {
+    const totalBudget = admins.reduce((s, a) => s + computeOversight(a.id, assignments, ministries).budget, 0);
+    const assignedCount = Object.values(assignments).filter(Boolean).length;
+    const avgPerAdmin = (assignedCount / admins.length).toFixed(1);
+    const unassigned = ministries.filter((m) => !assignments[m.id]);
+    return { totalBudget, assignedCount, avgPerAdmin, unassigned };
+  }, [assignments, ministries, admins]);
+
+  const counts = {
+    all: admins.length,
+    executive: admins.filter((a) => a.type === "executive").length,
+    campus: admins.filter((a) => a.type === "campus").length,
+    function: admins.filter((a) => a.type === "function").length,
+  };
+
+  const visible = filter === "all" ? admins : admins.filter((a) => a.type === filter);
+
+  const handleSave = (selected) => {
+    setAssignments((prev) => {
+      const next = { ...prev };
+      for (const [mid, aid] of Object.entries(next)) {
+        if (aid === editing.id) next[mid] = null;
+      }
+      for (const mid of selected) {
+        next[mid] = editing.id;
+      }
+      return next;
+    });
+  };
+
+  return (
+    <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* TOP STATS */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+        <Card style={{ padding: 22 }}>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Administrators</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 500, color: COLORS.ink, marginTop: 6, letterSpacing: -0.5 }}>{ADMINISTRATORS.length}</div>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>{counts.executive} exec · {counts.function} function · {counts.campus} campus</div>
+        </Card>
+        <Card style={{ padding: 22 }}>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Combined oversight</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 500, color: COLORS.ink, marginTop: 6, letterSpacing: -0.5 }}>{fmtShort(stats.totalBudget)}</div>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>across all ministries</div>
+        </Card>
+        <Card style={{ padding: 22, backgroundColor: stats.unassigned.length === 0 ? COLORS.surface : "#FBE8D040", borderColor: stats.unassigned.length === 0 ? COLORS.border : COLORS.amber + "60" }}>
+          <div style={{ fontSize: 11, color: stats.unassigned.length === 0 ? COLORS.inkSoft : COLORS.amber, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Coverage</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 500, color: COLORS.ink, marginTop: 6, letterSpacing: -0.5 }}>
+            {stats.assignedCount} <span style={{ color: COLORS.inkSoft, fontSize: 18 }}>/ {ministries.length}</span>
+          </div>
+          <div style={{ fontSize: 12, color: stats.unassigned.length === 0 ? COLORS.green : COLORS.amber, marginTop: 2, fontWeight: 600 }}>
+            {stats.unassigned.length === 0 ? "All ministries covered" : `${stats.unassigned.length} unassigned`}
+          </div>
+        </Card>
+        <Card style={{ padding: 22 }}>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Avg. ministries per admin</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 500, color: COLORS.ink, marginTop: 6, letterSpacing: -0.5 }}>{stats.avgPerAdmin}</div>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>across all admins</div>
+        </Card>
+      </div>
+
+      {/* UNASSIGNED WARNING */}
+      {stats.unassigned.length > 0 && (
+        <Card style={{ padding: 16, backgroundColor: "#FBE8D040", borderColor: COLORS.amber + "60", display: "flex", alignItems: "center", gap: 12 }}>
+          <AlertTriangle size={18} color={COLORS.amber} />
+          <div style={{ flex: 1, fontSize: 13, color: COLORS.ink }}>
+            <strong>{stats.unassigned.length} ministr{stats.unassigned.length === 1 ? "y has" : "ies have"} no administrator:</strong>{" "}
+            {stats.unassigned.map((m) => m.name).join(", ")}. Every dollar should have a name attached.
+          </div>
+        </Card>
+      )}
+
+      {/* FILTER TABS + ADD */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[
+            { id: "all", label: "All" },
+            { id: "executive", label: "Executive" },
+            { id: "campus", label: "Campus" },
+            { id: "function", label: "Function" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setFilter(tab.id)}
+              style={{
+                padding: "8px 14px", border: filter === tab.id ? "none" : `1px solid ${COLORS.border}`,
+                backgroundColor: filter === tab.id ? COLORS.forest : "transparent",
+                color: filter === tab.id ? COLORS.cream : COLORS.ink,
+                borderRadius: 8, fontSize: 12, fontWeight: 600, fontFamily: fontBody,
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+              }}
+            >
+              {tab.label}
+              <span style={{
+                padding: "1px 7px", borderRadius: 99, fontSize: 10, fontWeight: 700,
+                backgroundColor: filter === tab.id ? "rgba(255,255,255,0.18)" : COLORS.cream,
+                color: filter === tab.id ? COLORS.cream : COLORS.inkSoft,
+              }}>{counts[tab.id]}</span>
+            </button>
+          ))}
+        </div>
+        <button onClick={addAdmin} style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: COLORS.cream, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
+          <UserPlus size={14} /> Add administrator
+        </button>
+      </div>
+
+      {/* ADMIN CARDS */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 16 }}>
+        {visible.map((admin) => {
+          const oversight = computeOversight(admin.id, assignments, ministries);
+          const tone = ADMIN_TYPE_TONE[admin.type];
+          const pct = oversight.budget > 0 ? (oversight.spent / oversight.budget) * 100 : 0;
+
+          return (
+            <Card key={admin.id} style={{ padding: 22, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, backgroundColor: tone.color }} />
+
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 4, marginBottom: 12 }}>
+                <div style={{ width: 48, height: 48, borderRadius: "50%", backgroundColor: tone.color, color: tone.color === COLORS.amber ? COLORS.forestDeep : COLORS.cream, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 15, flexShrink: 0 }}>
+                  {admin.avatar}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <EditableText
+                    value={admin.name}
+                    onChange={(v) => renameAdmin(admin.id, v)}
+                    style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 600, color: COLORS.ink, letterSpacing: -0.3 }}
+                  />
+                  <div style={{ marginTop: 2 }}>
+                    <EditableText
+                      value={admin.title}
+                      onChange={(v) => updateAdminTitle(admin.id, v)}
+                      style={{ fontSize: 12, color: COLORS.inkSoft, fontFamily: fontBody }}
+                    />
+                  </div>
+                </div>
+                <button onClick={() => setEditing(admin)} style={{ display: "flex", alignItems: "center", gap: 5, background: "transparent", border: `1px solid ${COLORS.border}`, padding: "6px 10px", borderRadius: 7, fontSize: 11, fontFamily: fontBody, fontWeight: 600, cursor: "pointer", color: COLORS.ink }}>
+                  <Edit3 size={11} /> Assign
+                </button>
+              </div>
+
+              <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+                <Pill tone={admin.type === "executive" ? "forest" : admin.type === "function" ? "copper" : "warn"}>
+                  {tone.label}
+                </Pill>
+                <Pill tone="neutral">{admin.campus}</Pill>
+              </div>
+
+              <div style={{ fontSize: 12, color: COLORS.ink, fontStyle: "italic", lineHeight: 1.55, marginBottom: 16 }}>
+                {admin.bio}
+              </div>
+
+              {oversight.ministries.length > 0 ? (
+                <>
+                  <div style={{ padding: 14, backgroundColor: COLORS.bg, borderRadius: 10, marginBottom: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Total oversight</span>
+                      <span style={{ fontSize: 11, color: COLORS.inkSoft }}>{oversight.ministries.length} ministr{oversight.ministries.length === 1 ? "y" : "ies"}</span>
+                    </div>
+                    <div style={{ fontFamily: fontDisplay, fontSize: 24, fontWeight: 500, color: COLORS.ink, letterSpacing: -0.5 }}>{fmt(oversight.budget)}</div>
+                    <div style={{ height: 6, backgroundColor: COLORS.cream, borderRadius: 99, overflow: "hidden", marginTop: 8 }}>
+                      <div style={{ height: "100%", width: `${Math.min(pct, 100)}%`, backgroundColor: pct > 95 ? COLORS.red : pct > 85 ? COLORS.amber : COLORS.green, borderRadius: 99 }} />
+                    </div>
+                    <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 4 }}>{fmt(oversight.spent)} spent · {pct.toFixed(0)}% of budget</div>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                    {oversight.ministries.map((m) => {
+                      const mp = (m.spent / m.budget) * 100;
+                      return (
+                        <div key={m.id} style={{ display: "grid", gridTemplateColumns: "20px 1fr 60px", gap: 8, alignItems: "center", padding: "4px 0" }}>
+                          <span style={{ fontSize: 14, color: m.color, fontFamily: fontDisplay, fontWeight: 600 }}>{m.icon}</span>
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.ink }}>{m.name}</div>
+                            <div style={{ height: 3, backgroundColor: COLORS.cream, borderRadius: 99, marginTop: 3, overflow: "hidden" }}>
+                              <div style={{ height: "100%", width: `${Math.min(mp, 100)}%`, backgroundColor: m.color }} />
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 10, color: COLORS.inkSoft, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                            {fmtShort(m.spent)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div style={{ padding: 18, border: `1px dashed ${COLORS.border}`, borderRadius: 10, textAlign: "center" }}>
+                  <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 8 }}>No ministries assigned yet</div>
+                  <button onClick={() => setEditing(admin)} style={{ background: COLORS.cream, border: `1px solid ${COLORS.border}`, padding: "7px 12px", borderRadius: 7, fontSize: 12, fontWeight: 600, fontFamily: fontBody, cursor: "pointer", color: COLORS.ink, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <Plus size={12} /> Assign ministries
+                  </button>
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* HINT FOOTER */}
+      <Card style={{ padding: 14, backgroundColor: COLORS.bg, borderColor: COLORS.borderSoft, display: "flex", alignItems: "center", gap: 10 }}>
+        <Info size={14} color={COLORS.inkSoft} />
+        <div style={{ fontSize: 12, color: COLORS.inkSoft }}>
+          A ministry has exactly one administrator at a time. Reassigning automatically removes it from the previous owner — no double-assignment possible.
+        </div>
+      </Card>
+
+      {editingAdmin && (
+        <AssignmentModal
+          admin={editingAdmin}
+          assignments={assignments}
+          ministries={ministries}
+          renameMinistry={renameMinistry}
+          updateMinistryBudget={updateMinistryBudget}
+          addMinistry={addMinistry}
+          onSave={handleSave}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
   );
 };
@@ -1390,8 +2591,10 @@ export default function IRCChurchApp() {
     dashboard: { t: "Dashboard", s: "IRC Church · Fiscal Year 2025 overview" },
     donations: { t: "Donations", s: "All giving · all sources · all campuses" },
     expenses: { t: "Expenses", s: "Where the money goes" },
+    budget: { t: "Budget", s: "Plan, monitor, stress-test — and stay on top of it" },
     ministries: { t: "Ministries", s: "Budget vs. actual for every department" },
     campuses: { t: "Campuses", s: "Main · Tacoma · New York" },
+    administrators: { t: "Administrators", s: "Who oversees what — budgets that update as you reassign" },
     events: { t: "Events & Camps", s: "23 events · 3,901 attendees" },
     receipts: { t: "Receipts", s: "Snap, classify, sync — automatically" },
     people: { t: "People & Roles", s: "Manage who can see and do what" },
@@ -1405,8 +2608,10 @@ export default function IRCChurchApp() {
       case "dashboard": return <DashboardPage />;
       case "donations": return <DonationsPage />;
       case "expenses": return <ExpensesPage />;
+      case "budget": return <BudgetPage />;
       case "ministries": return <MinistriesPage openReceiptModal={open} />;
       case "campuses": return <CampusesPage />;
+      case "administrators": return <AdministratorsPage />;
       case "events": return <EventsPage />;
       case "receipts": return <ReceiptsPage openReceiptModal={open} />;
       case "people": return <PeoplePage />;
