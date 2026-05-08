@@ -20,40 +20,41 @@ import { RULES as ALERT_RULES, evaluate as evaluateAlerts, buildContext as build
 // DESIGN TOKENS
 // ============================================================
 const COLORS = {
-  bg: "#FAF6EE",
-  surface: "#FFFFFF",
-  ink: "#1A1F1C",
-  inkSoft: "#5A6660",
-  forest: "#1F3A34",
-  forestDeep: "#152724",
-  copper: "#B8855E",
-  copperSoft: "#E8C9A8",
-  cream: "#F4ECDC",
-  border: "#E5DDC9",
-  borderSoft: "#EFE7D6",
-  green: "#2D6A4F",
-  red: "#A4392F",
-  amber: "#C97B2F",
+  bg: "#0A0A0A",          // page canvas
+  surface: "#141414",     // card surface
+  ink: "#FAFAFA",         // primary text on dark
+  inkSoft: "#A0A0A0",     // muted text
+  forest: "#D4FF00",      // PRIMARY (lime) — was forest green
+  forestDeep: "#000000",  // deep black accent
+  copper: "#FF5A1F",      // SECONDARY (orange) — was copper brown
+  copperSoft: "#FFB088",  // light orange tint
+  cream: "#1F1F1F",       // tinted dark surface (was light beige)
+  border: "#2A2A2A",      // standard border
+  borderSoft: "#1A1A1A",  // softer / lower contrast border
+  green: "#4ADE80",       // success
+  red: "#FF3B8A",         // danger / IRC pink — was brick red
+  amber: "#FBBF24",       // warning
 };
 
-const fontDisplay = `'Fraunces', 'Times New Roman', serif`;
-const fontBody = `'Plus Jakarta Sans', -apple-system, sans-serif`;
+const fontDisplay = `'Bricolage Grotesque', -apple-system, sans-serif`;
+const fontBody = `'Manrope', -apple-system, sans-serif`;
+const fontSerif = `'Instrument Serif', 'Times New Roman', serif`;
 
 // ============================================================
 // REAL 2025 DATA FROM IRC CHURCH FINANCIAL STATEMENT
 // ============================================================
 const DONATIONS_2025 = [
-  { name: "Tithes & Offering", value: 1407005.03, color: "#1F3A34" },
-  { name: "Month of Giving", value: 148302.69, color: "#2D6A4F" },
-  { name: "Events Registration", value: 115976.22, color: "#B8855E" },
-  { name: "Legacy", value: 108297.28, color: "#52796F" },
-  { name: "New York Campus", value: 44000.00, color: "#84A98C" },
-  { name: "Tacoma Campus", value: 24262.53, color: "#9B7B5A" },
-  { name: "Merch", value: 13426.61, color: "#C97B2F" },
-  { name: "Building Fund", value: 7136.05, color: "#D4A373" },
-  { name: "Kids Ministry", value: 7154.06, color: "#A98467" },
-  { name: "Single Mothers", value: 5393.11, color: "#E8C9A8" },
-  { name: "Pastor's Blessing", value: 1748.75, color: "#CCC5A8" },
+  { name: "Tithes & Offering", value: 1407005.03, color: "#D4FF00" },   // lime
+  { name: "Month of Giving", value: 148302.69, color: "#FF5A1F" },     // orange
+  { name: "Events Registration", value: 115976.22, color: "#FF3B8A" }, // pink
+  { name: "Legacy", value: 108297.28, color: "#FBBF24" },              // amber
+  { name: "New York Campus", value: 44000.00, color: "#A78BFA" },      // indigo
+  { name: "Tacoma Campus", value: 24262.53, color: "#22D3EE" },        // teal
+  { name: "Merch", value: 13426.61, color: "#F472B6" },                // rose
+  { name: "Building Fund", value: 7136.05, color: "#4ADE80" },         // green
+  { name: "Kids Ministry", value: 7154.06, color: "#FBBF24" },         // amber
+  { name: "Single Mothers", value: 5393.11, color: "#A78BFA" },        // indigo
+  { name: "Pastor's Blessing", value: 1748.75, color: "#22D3EE" },     // teal
 ];
 
 const ADMIN_EXPENSES = [
@@ -69,20 +70,20 @@ const ADMIN_EXPENSES = [
 ];
 
 const MINISTRIES = [
-  { id: "worship", name: "Worship", spent: 17625.73, budget: 22000, leader: "Anna K.", campus: "main", color: "#1F3A34", icon: "♪" },
-  { id: "technical", name: "Technical", spent: 33531.65, budget: 38000, leader: "Mark D.", campus: "main", color: "#2D6A4F", icon: "⚙" },
-  { id: "video", name: "Video", spent: 5547.85, budget: 8000, leader: "Sergei P.", campus: "main", color: "#52796F", icon: "▶" },
-  { id: "light-screen", name: "Light & Screen", spent: 2019.90, budget: 3500, leader: "Tom B.", campus: "main", color: "#84A98C", icon: "✦" },
-  { id: "media", name: "Media", spent: 6590.64, budget: 9000, leader: "Lana V.", campus: "main", color: "#B8855E", icon: "◈" },
-  { id: "kids", name: "Kids Ministry", spent: 16850.34, budget: 20000, leader: "Maria R.", campus: "main", color: "#C97B2F", icon: "✧" },
-  { id: "teens", name: "Teens", spent: 5615.34, budget: 8000, leader: "David O.", campus: "main", color: "#D4A373", icon: "♦" },
-  { id: "youth", name: "Youth", spent: 9161.67, budget: 12000, leader: "Eli T.", campus: "main", color: "#9B7B5A", icon: "▲" },
-  { id: "single-mom", name: "Single Moms", spent: 6073.25, budget: 8000, leader: "Olga S.", campus: "main", color: "#A98467", icon: "♥" },
-  { id: "deaf", name: "Deaf & Hard of Hearing", spent: 3082.89, budget: 5000, leader: "Ruth M.", campus: "main", color: "#52796F", icon: "✋" },
-  { id: "legacy", name: "Legacy", spent: 2124.07, budget: 4000, leader: "John W.", campus: "main", color: "#1F3A34", icon: "✚" },
-  { id: "services", name: "Sun/Fri Services & Care", spent: 57334.39, budget: 65000, leader: "Pastor Vlad", campus: "main", color: "#2D6A4F", icon: "✟" },
-  { id: "target", name: "Target Outreach", spent: 11518.67, budget: 15000, leader: "Anna K.", campus: "main", color: "#B8855E", icon: "◎" },
-  { id: "merch", name: "Merch", spent: 13178.36, budget: 14000, leader: "Sasha L.", campus: "main", color: "#C97B2F", icon: "◇" },
+  { id: "worship", name: "Worship", spent: 17625.73, budget: 22000, leader: "Anna K.", campus: "main", color: "#D4FF00", icon: "♪" },          // lime
+  { id: "technical", name: "Technical", spent: 33531.65, budget: 38000, leader: "Mark D.", campus: "main", color: "#FF5A1F", icon: "⚙" },     // orange
+  { id: "video", name: "Video", spent: 5547.85, budget: 8000, leader: "Sergei P.", campus: "main", color: "#FF3B8A", icon: "▶" },             // pink
+  { id: "light-screen", name: "Light & Screen", spent: 2019.90, budget: 3500, leader: "Tom B.", campus: "main", color: "#FBBF24", icon: "✦" },// yellow
+  { id: "media", name: "Media", spent: 6590.64, budget: 9000, leader: "Lana V.", campus: "main", color: "#A78BFA", icon: "◈" },               // purple
+  { id: "kids", name: "Kids Ministry", spent: 16850.34, budget: 20000, leader: "Maria R.", campus: "main", color: "#22D3EE", icon: "✧" },     // teal
+  { id: "teens", name: "Teens", spent: 5615.34, budget: 8000, leader: "David O.", campus: "main", color: "#F472B6", icon: "♦" },              // rose
+  { id: "youth", name: "Youth", spent: 9161.67, budget: 12000, leader: "Eli T.", campus: "main", color: "#4ADE80", icon: "▲" },               // green
+  { id: "single-mom", name: "Single Moms", spent: 6073.25, budget: 8000, leader: "Olga S.", campus: "main", color: "#FB923C", icon: "♥" },    // peach
+  { id: "deaf", name: "Deaf & Hard of Hearing", spent: 3082.89, budget: 5000, leader: "Ruth M.", campus: "main", color: "#60A5FA", icon: "✋" },// sky
+  { id: "legacy", name: "Legacy", spent: 2124.07, budget: 4000, leader: "John W.", campus: "main", color: "#FACC15", icon: "✚" },             // gold
+  { id: "services", name: "Sun/Fri Services & Care", spent: 57334.39, budget: 65000, leader: "Pastor Vlad", campus: "main", color: "#D4FF00", icon: "✟" }, // lime
+  { id: "target", name: "Target Outreach", spent: 11518.67, budget: 15000, leader: "Anna K.", campus: "main", color: "#FF5A1F", icon: "◎" },  // orange
+  { id: "merch", name: "Merch", spent: 13178.36, budget: 14000, leader: "Sasha L.", campus: "main", color: "#FF3B8A", icon: "◇" },            // pink
 ];
 
 const EVENTS_CAMPS = [
@@ -215,6 +216,91 @@ const DONATION_TIERS = [
   { name: "Vision", target: DONATION_TARGET_YR, desc: "Operating + savings + new initiatives.", color: COLORS.green },
 ];
 
+// Last-month (April 2026) spend per ministry — drives end-of-month reconciliation.
+const LAST_MONTH_SPEND = {
+  worship: 1420,
+  technical: 3210,        // over budget
+  video: 540,
+  "light-screen": 230,
+  media: 590,
+  kids: 1480,
+  teens: 540,
+  youth: 850,
+  "single-mom": 290,
+  deaf: 280,
+  legacy: 175,
+  services: 4920,
+  target: 990,
+  merch: 1015,
+};
+
+// 6-month utilization history per ministry (% of monthly budget spent).
+// Drives the recommendations engine pattern detection.
+const UTILIZATION_HISTORY = {
+  worship: [85, 88, 91, 87, 89, 86],
+  technical: [98, 105, 102, 95, 99, 88],
+  video: [55, 60, 65, 62, 68, 64],
+  "light-screen": [45, 78, 30, 62, 85, 50],
+  media: [78, 82, 75, 80, 79, 81],
+  kids: [88, 90, 87, 92, 89, 91],
+  teens: [62, 58, 65, 60, 63, 61],
+  youth: [82, 85, 80, 87, 84, 86],
+  "single-mom": [42, 48, 50, 45, 38, 52],
+  deaf: [55, 58, 52, 60, 56, 57],
+  legacy: [50, 55, 48, 52, 57, 53],
+  services: [88, 90, 87, 89, 91, 88],
+  target: [82, 85, 80, 84, 83, 81],
+  merch: [92, 95, 93, 94, 96, 92],
+};
+
+// Hand-tuned suggestions so totals reconcile to round numbers.
+const RECOMMENDATIONS_OVERRIDE = {
+  video: 5500,
+  teens: 5000,
+  "single-mom": 4500,
+  deaf: 3500,
+  legacy: 3000,
+  technical: 42000,
+};
+
+// Classify a ministry into reduce / increase / volatile / on-track.
+// type:        'reduce' | 'increase' | 'volatile' | 'on-track'
+// confidence:  'high' | 'medium' | 'low' (only for actionable types)
+// suggestedBudget: optional new annual budget (null for volatile/on-track)
+function classifyMinistry(m) {
+  const history = UTILIZATION_HISTORY[m.id] || [];
+  if (history.length === 0) return { type: "on-track", confidence: "low", reasoning: "No data yet", history };
+  const avg = history.reduce((s, n) => s + n, 0) / history.length;
+  const max = Math.max(...history);
+  const min = Math.min(...history);
+  const range = max - min;
+  const overCount = history.filter((n) => n > 100).length;
+
+  let type, confidence, reasoning;
+
+  if (range > 35) {
+    type = "volatile";
+    confidence = "—";
+    reasoning = `Spending varies ${min}–${max}% — pattern needs human review`;
+  } else if (avg < 65) {
+    type = "reduce";
+    confidence = range < 15 ? "high" : "medium";
+    reasoning = `${Math.round(avg)}% average utilization — significantly underused`;
+  } else if (overCount >= 2 || avg > 95) {
+    type = "increase";
+    confidence = overCount >= 2 ? "medium" : "low";
+    reasoning = `Exceeded budget ${overCount} of ${history.length} months — under-allocated`;
+  } else {
+    type = "on-track";
+    confidence = "high";
+    reasoning = avg >= 90 ? "Excellent budget discipline" : avg >= 85 ? "Well-managed" : "On track";
+  }
+
+  const suggestedBudget = RECOMMENDATIONS_OVERRIDE[m.id] ?? null;
+  const delta = suggestedBudget != null ? suggestedBudget - m.budget : 0;
+  return { type, confidence, reasoning, history, avg, max, min, range, suggestedBudget, delta };
+}
+
 const STRESS_SCENARIOS = [
   { name: "Baseline", drop: 0, projected: DONATION_TARGET_YR },
   { name: "−10% downturn", drop: 0.10, projected: DONATION_TARGET_YR * 0.90 },
@@ -235,12 +321,12 @@ const fmtShort = (n) => {
 
 const Pill = ({ children, tone = "neutral" }) => {
   const tones = {
-    neutral: { bg: "#F4ECDC", color: "#5A6660" },
-    success: { bg: "#DDEDE0", color: "#2D6A4F" },
-    warn: { bg: "#FBE8D0", color: "#C97B2F" },
-    danger: { bg: "#F4D9D5", color: "#A4392F" },
-    forest: { bg: "#1F3A34", color: "#FAF6EE" },
-    copper: { bg: "#E8C9A8", color: "#7A4F2E" },
+    neutral: { bg: "#1F1F1F", color: "#A0A0A0" },
+    success: { bg: "rgba(74,222,128,0.16)", color: "#4ADE80" },
+    warn: { bg: "rgba(251,191,36,0.18)", color: "#FBBF24" },
+    danger: { bg: "rgba(255,59,138,0.18)", color: "#FF3B8A" },
+    forest: { bg: "#D4FF00", color: "#0A0A0A" },
+    copper: { bg: "rgba(255,90,31,0.18)", color: "#FF5A1F" },
   };
   const s = tones[tone] || tones.neutral;
   return (
@@ -350,7 +436,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
 
   return (
     <aside style={{
-      width: 248, backgroundColor: COLORS.forestDeep, color: COLORS.cream,
+      width: 248, backgroundColor: COLORS.forestDeep, color: COLORS.ink,
       display: "flex", flexDirection: "column", padding: "24px 0",
       borderRight: `1px solid ${COLORS.border}`, height: "100vh", position: "sticky", top: 0,
     }}>
@@ -363,7 +449,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
           }}>✚</div>
           <div>
             <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 600, letterSpacing: -0.3 }}>IRC</div>
-            <div style={{ fontSize: 10, color: "rgba(244,236,220,0.6)", letterSpacing: 1.5, textTransform: "uppercase" }}>Steward · v1.0</div>
+            <div style={{ fontSize: 10, color: "rgba(250,250,250,0.6)", letterSpacing: 1.5, textTransform: "uppercase" }}>Steward · v1.0</div>
           </div>
         </div>
       </div>
@@ -380,7 +466,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
                 display: "flex", alignItems: "center", gap: 12,
                 padding: "10px 14px", borderRadius: 10,
                 backgroundColor: active ? COLORS.copper : "transparent",
-                color: active ? COLORS.forestDeep : "rgba(244,236,220,0.85)",
+                color: active ? COLORS.forestDeep : "rgba(250,250,250,0.85)",
                 border: "none", cursor: "pointer", fontSize: 14, fontWeight: active ? 600 : 500,
                 fontFamily: fontBody, textAlign: "left", transition: "all 0.15s",
               }}
@@ -398,10 +484,10 @@ const Sidebar = ({ activePage, setActivePage }) => {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: "50%", backgroundColor: COLORS.copper, color: COLORS.forestDeep, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12 }}>EV</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.cream }}>Elena Volkov</div>
-            <div style={{ fontSize: 11, color: "rgba(244,236,220,0.55)" }}>Finance Admin</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>Elena Volkov</div>
+            <div style={{ fontSize: 11, color: "rgba(250,250,250,0.55)" }}>Finance Admin</div>
           </div>
-          <Settings size={15} style={{ color: "rgba(244,236,220,0.55)", cursor: "pointer" }} />
+          <Settings size={15} style={{ color: "rgba(250,250,250,0.55)", cursor: "pointer" }} />
         </div>
       </div>
     </aside>
@@ -452,7 +538,7 @@ const TopBar = ({ activeCampus, setActiveCampus, pageTitle, pageSubtitle }) => {
             onClick={() => setCampusOpen(!campusOpen)}
             style={{
               display: "flex", alignItems: "center", gap: 10, padding: "9px 14px",
-              backgroundColor: COLORS.forest, color: COLORS.cream, border: "none",
+              backgroundColor: COLORS.forest, color: COLORS.bg, border: "none",
               borderRadius: 10, cursor: "pointer", fontFamily: fontBody, fontSize: 13, fontWeight: 600
             }}
           >
@@ -497,10 +583,12 @@ const TopBar = ({ activeCampus, setActiveCampus, pageTitle, pageSubtitle }) => {
 // BUDGET HEALTH HERO CARD (Dashboard top)
 // ============================================================
 
-const BudgetHealthCard = () => {
+const BudgetHealthCard = ({ ministries }) => {
   const currentDonations = MONTHLY_TREND[MONTHLY_TREND.length - 1].donations;
   const currentExpenses = MONTHLY_TREND[MONTHLY_TREND.length - 1].expenses;
-  const monthlyBudget = OPERATING_BUDGET_YR / 12;
+  const ministriesBudget = ministries.reduce((s, m) => s + m.budget, 0);
+  const operatingBudget = OPERATING_OVERHEAD_YR + ministriesBudget + EVENTS_BUDGET_YR + BLESSINGS_BUDGET_YR;
+  const monthlyBudget = operatingBudget / 12;
   const cashOnHand = BALANCE_END;
 
   const overheadCoverage = currentDonations / OPERATING_OVERHEAD_MO;
@@ -514,9 +602,9 @@ const BudgetHealthCard = () => {
   const status = passing === 3 ? "on-track" : passing === 2 ? "caution" : "at-risk";
 
   const cfg = {
-    "on-track": { label: "On Track", color: COLORS.green, bg: "#DDEDE0", accent: COLORS.green },
-    "caution": { label: "Caution", color: COLORS.amber, bg: "#FBE8D0", accent: COLORS.amber },
-    "at-risk": { label: "At Risk", color: COLORS.red, bg: "#F4D9D5", accent: COLORS.red },
+    "on-track": { label: "On Track", color: COLORS.green, bg: "rgba(74,222,128,0.16)", accent: COLORS.green },
+    "caution": { label: "Caution", color: COLORS.amber, bg: "rgba(251,191,36,0.18)", accent: COLORS.amber },
+    "at-risk": { label: "At Risk", color: COLORS.red, bg: "rgba(255,59,138,0.18)", accent: COLORS.red },
   }[status];
 
   const headline = status === "on-track"
@@ -597,7 +685,7 @@ const BudgetHealthCard = () => {
 // DASHBOARD PAGE
 // ============================================================
 
-const DashboardPage = () => {
+const DashboardPage = ({ ministries }) => {
   const kpis = [
     { label: "Total Donations '25", value: fmt(TOTAL_DONATIONS), trend: "+12.4%", icon: HandHeart, tone: "forest" },
     { label: "Total Expenses '25", value: fmt(TOTAL_EXPENSES), trend: "88.05% of donations", icon: Receipt, tone: "copper" },
@@ -607,7 +695,7 @@ const DashboardPage = () => {
 
   return (
     <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 24 }}>
-      <BudgetHealthCard />
+      <BudgetHealthCard ministries={ministries} />
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
         {kpis.map((k, i) => {
@@ -619,7 +707,7 @@ const DashboardPage = () => {
                 <div style={{
                   width: 32, height: 32, borderRadius: 8,
                   backgroundColor: i === 0 ? COLORS.forest : i === 1 ? COLORS.copper : i === 2 ? COLORS.green : COLORS.ink,
-                  color: COLORS.cream, display: "flex", alignItems: "center", justifyContent: "center"
+                  color: COLORS.ink, display: "flex", alignItems: "center", justifyContent: "center"
                 }}>
                   <Icon size={16} />
                 </div>
@@ -667,8 +755,8 @@ const DashboardPage = () => {
               <YAxis stroke={COLORS.inkSoft} fontSize={11} tickLine={false} axisLine={false} tickFormatter={fmtShort} />
               <Tooltip
                 contentStyle={{ backgroundColor: COLORS.forestDeep, border: "none", borderRadius: 10, fontSize: 12 }}
-                labelStyle={{ color: COLORS.cream }}
-                itemStyle={{ color: COLORS.cream }}
+                labelStyle={{ color: COLORS.ink }}
+                itemStyle={{ color: COLORS.ink }}
                 formatter={(v) => fmtShort(v)}
               />
               <Area type="monotone" dataKey="donations" stroke={COLORS.forest} strokeWidth={2} fill="url(#don)" />
@@ -687,7 +775,7 @@ const DashboardPage = () => {
               <Pie data={DONATIONS_2025.slice(0, 6)} cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={2} dataKey="value">
                 {DONATIONS_2025.slice(0, 6).map((d, i) => <Cell key={i} fill={d.color} />)}
               </Pie>
-              <Tooltip formatter={(v) => fmtShort(v)} contentStyle={{ backgroundColor: COLORS.forestDeep, border: "none", borderRadius: 10, fontSize: 12, color: COLORS.cream }} />
+              <Tooltip formatter={(v) => fmtShort(v)} contentStyle={{ backgroundColor: COLORS.forestDeep, border: "none", borderRadius: 10, fontSize: 12, color: COLORS.ink }} />
             </PieChart>
           </ResponsiveContainer>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
@@ -708,14 +796,14 @@ const DashboardPage = () => {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
             <div>
               <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 500, color: COLORS.ink, fontStyle: "italic" }}>Ministry spend vs. budget</div>
-              <div style={{ fontSize: 12, color: COLORS.inkSoft }}>{MINISTRIES.length} active ministries</div>
+              <div style={{ fontSize: 12, color: COLORS.inkSoft }}>{ministries.length} active ministries</div>
             </div>
             <button style={{ background: "transparent", border: `1px solid ${COLORS.border}`, padding: "6px 12px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, cursor: "pointer", color: COLORS.ink }}>
               View all →
             </button>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {MINISTRIES.slice(0, 8).map((m) => {
+            {ministries.slice(0, 8).map((m) => {
               const pct = (m.spent / m.budget) * 100;
               return (
                 <div key={m.id} style={{ display: "grid", gridTemplateColumns: "150px 1fr 110px", gap: 14, alignItems: "center" }}>
@@ -762,15 +850,15 @@ const DashboardPage = () => {
       </div>
 
       {/* Camp/Retreat strip */}
-      <Card style={{ padding: 24, backgroundColor: COLORS.forestDeep, color: COLORS.cream, border: "none" }}>
+      <Card style={{ padding: 24, backgroundColor: COLORS.forestDeep, color: COLORS.ink, border: "none" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <div>
             <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 500, fontStyle: "italic" }}>Camps & retreats, 2025</div>
-            <div style={{ fontSize: 13, color: "rgba(244,236,220,0.7)" }}>23 events · {fmt(247906.01)} spent · {fmt(115976.22)} recovered via registration</div>
+            <div style={{ fontSize: 13, color: "rgba(250,250,250,0.7)" }}>23 events · {fmt(247906.01)} spent · {fmt(115976.22)} recovered via registration</div>
           </div>
           <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
             <div>
-              <div style={{ fontSize: 11, color: "rgba(244,236,220,0.6)", letterSpacing: 0.4, textTransform: "uppercase" }}>Net cost</div>
+              <div style={{ fontSize: 11, color: "rgba(250,250,250,0.6)", letterSpacing: 0.4, textTransform: "uppercase" }}>Net cost</div>
               <div style={{ fontFamily: fontDisplay, fontSize: 26, fontWeight: 500, letterSpacing: -0.5 }}>{fmt(131929.79)}</div>
             </div>
           </div>
@@ -779,7 +867,7 @@ const DashboardPage = () => {
           {EVENTS_CAMPS.slice(0, 12).map((e, i) => (
             <div key={i} style={{ padding: "12px 14px", backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 10, fontSize: 12 }}>
               <div style={{ fontWeight: 600 }}>{e.name}</div>
-              <div style={{ color: "rgba(244,236,220,0.6)", fontSize: 11, marginTop: 2 }}>{e.attendees} attended</div>
+              <div style={{ color: "rgba(250,250,250,0.6)", fontSize: 11, marginTop: 2 }}>{e.attendees} attended</div>
             </div>
           ))}
         </div>
@@ -804,7 +892,7 @@ const DonationsPage = () => {
             <div style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 500, color: COLORS.ink, fontStyle: "italic" }}>Live giving sources</div>
             <div style={{ fontSize: 12, color: COLORS.inkSoft }}>Connected payment platforms · synced every 15 min</div>
           </div>
-          <button style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: COLORS.cream, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
+          <button style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: COLORS.bg, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
             <RefreshCw size={13} /> Sync now
           </button>
         </div>
@@ -946,7 +1034,7 @@ const ExpensesPage = () => {
             <CartesianGrid strokeDasharray="2 4" stroke={COLORS.border} horizontal={false} />
             <XAxis type="number" stroke={COLORS.inkSoft} fontSize={11} tickFormatter={fmtShort} axisLine={false} tickLine={false} />
             <YAxis dataKey="name" type="category" stroke={COLORS.inkSoft} fontSize={11} width={200} axisLine={false} tickLine={false} />
-            <Tooltip formatter={(v) => fmt(v)} contentStyle={{ backgroundColor: COLORS.forestDeep, border: "none", borderRadius: 10, fontSize: 12, color: COLORS.cream }} />
+            <Tooltip formatter={(v) => fmt(v)} contentStyle={{ backgroundColor: COLORS.forestDeep, border: "none", borderRadius: 10, fontSize: 12, color: COLORS.ink }} />
             <Bar dataKey="value" fill={COLORS.forest} radius={[0, 6, 6, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -962,9 +1050,9 @@ const ExpensesPage = () => {
 const ALERT_ICONS = { TrendingDown, AlertTriangle, Receipt, Flame };
 
 const SEVERITY_TONE = {
-  critical: { color: COLORS.red, bg: "#F4D9D5", label: "Critical" },
-  warning: { color: COLORS.amber, bg: "#FBE8D0", label: "Warning" },
-  info: { color: COLORS.copper, bg: "#E8C9A8", label: "Info" },
+  critical: { color: COLORS.red, bg: "rgba(255,59,138,0.18)", label: "Critical" },
+  warning: { color: COLORS.amber, bg: "rgba(251,191,36,0.18)", label: "Warning" },
+  info: { color: COLORS.copper, bg: "rgba(255,90,31,0.18)", label: "Info" },
 };
 
 const ThresholdsPanel = ({ config, alerts, updateThreshold }) => {
@@ -1020,10 +1108,10 @@ const ThresholdsPanel = ({ config, alerts, updateThreshold }) => {
   );
 };
 
-const AlertsLivePanel = ({ alerts, config }) => {
+const AlertsLivePanel = ({ alerts, config, ministries }) => {
   const ctx = buildAlertContext({
     monthlyTrend: MONTHLY_TREND,
-    ministries: MINISTRIES,
+    ministries: ministries,
     receipts: RECENT_RECEIPTS,
     cashOnHand: BALANCE_END,
     operatingOverheadMo: OPERATING_OVERHEAD_MO,
@@ -1065,7 +1153,7 @@ const AlertsLivePanel = ({ alerts, config }) => {
             }}>
               <div style={{
                 width: 28, height: 28, borderRadius: 7, flexShrink: 0,
-                backgroundColor: muted ? COLORS.border : triggered ? tone.color : "#DDEDE0",
+                backgroundColor: muted ? COLORS.border : triggered ? tone.color : "rgba(74,222,128,0.16)",
                 color: muted ? COLORS.inkSoft : triggered ? "#fff" : COLORS.green,
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
@@ -1107,10 +1195,405 @@ const AlertsLivePanel = ({ alerts, config }) => {
 };
 
 // ============================================================
+// END-OF-MONTH RECONCILIATION
+// ============================================================
+
+const ReconciliationSection = ({ ministries }) => {
+  const [decisions, setDecisions] = useState({});
+
+  const items = ministries.map((m) => {
+    const monthlyBudget = m.budget / 12;
+    const spent = LAST_MONTH_SPEND[m.id] ?? monthlyBudget * 0.9;
+    const leftover = monthlyBudget - spent;
+    return { ...m, monthlyBudget, spent, leftover };
+  });
+
+  const totalLeftover = items.reduce((s, i) => s + Math.max(0, i.leftover), 0);
+  const eligible = items.filter((i) => i.leftover > 0);
+  const overBudget = items.filter((i) => i.leftover < 0);
+  const decidedCount = Object.keys(decisions).length;
+  const rolled = items.filter((i) => decisions[i.id] === "roll").reduce((s, i) => s + i.leftover, 0);
+  const returned = items.filter((i) => decisions[i.id] === "return").reduce((s, i) => s + i.leftover, 0);
+
+  const decide = (id, action) => setDecisions((d) => ({ ...d, [id]: action }));
+  const decideAll = (action) => {
+    const next = { ...decisions };
+    for (const i of eligible) next[i.id] = action;
+    setDecisions(next);
+  };
+
+  return (
+    <Card style={{ padding: 28, position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, ${COLORS.copper} 0%, ${COLORS.forest} 100%)` }} />
+
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20, marginBottom: 18 }}>
+        <div style={{ flex: 1 }}>
+          <Pill tone="copper">⚡ April 2026 month-end</Pill>
+          <div style={{ fontFamily: fontDisplay, fontSize: 44, fontWeight: 600, color: COLORS.forest, letterSpacing: -1.2, marginTop: 14, lineHeight: 1.05 }}>
+            {fmt(totalLeftover)} <span style={{ color: COLORS.ink, fontWeight: 500 }}>unused last month</span>
+          </div>
+          <div style={{ fontFamily: fontSerif, fontSize: 18, fontStyle: "italic", color: COLORS.inkSoft, marginTop: 10, lineHeight: 1.5, maxWidth: 600 }}>
+            would you like to roll it forward to May, or return it to the church general fund?
+          </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, flexShrink: 0, alignSelf: "center" }}>
+          <button onClick={() => decideAll("roll")} style={{ padding: "12px 22px", backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+            <ArrowUpRight size={14} /> Roll all forward to May
+          </button>
+          <button onClick={() => decideAll("return")} style={{ padding: "12px 22px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody, whiteSpace: "nowrap" }}>
+            Return all to general fund
+          </button>
+        </div>
+      </div>
+
+      <div style={{ padding: 12, backgroundColor: COLORS.cream, borderRadius: 9, marginBottom: 14, fontSize: 12, color: COLORS.ink, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <span><strong style={{ color: COLORS.forest }}>{decidedCount}</strong> of {eligible.length} decided</span>
+        <span style={{ color: COLORS.inkSoft }}>·</span>
+        <span>rolled <strong style={{ color: COLORS.green }}>{fmt(rolled)}</strong></span>
+        <span style={{ color: COLORS.inkSoft }}>·</span>
+        <span>returned <strong style={{ color: COLORS.copper }}>{fmt(returned)}</strong></span>
+        {overBudget.length > 0 && (
+          <>
+            <span style={{ color: COLORS.inkSoft, marginLeft: "auto" }}>·</span>
+            <span style={{ color: COLORS.red }}>{overBudget.length} over budget · needs review</span>
+          </>
+        )}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {items.map((m) => {
+          const decision = decisions[m.id];
+          const isOver = m.leftover < 0;
+          return (
+            <div key={m.id} style={{
+              display: "grid", gridTemplateColumns: "30px 1fr 130px 240px",
+              gap: 12, alignItems: "center", padding: "10px 12px", borderRadius: 8,
+              backgroundColor: COLORS.bg, border: `1px solid ${COLORS.borderSoft}`,
+            }}>
+              <span style={{ color: m.color, fontFamily: fontDisplay, fontSize: 16, fontWeight: 600 }}>{m.icon}</span>
+              <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{m.name}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: isOver ? COLORS.red : COLORS.forest, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                {isOver ? "−" : "+"}{fmt(Math.abs(m.leftover))}
+              </div>
+              <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                {isOver ? (
+                  <Pill tone="danger">Over budget — needs review</Pill>
+                ) : decision === "roll" ? (
+                  <Pill tone="success">→ Rolled to May</Pill>
+                ) : decision === "return" ? (
+                  <Pill tone="copper">↺ Returned to fund</Pill>
+                ) : (
+                  <>
+                    <button onClick={() => decide(m.id, "roll")} style={{ padding: "6px 12px", backgroundColor: COLORS.cream, color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 6, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: fontBody }}>
+                      Roll
+                    </button>
+                    <button onClick={() => decide(m.id, "return")} style={{ padding: "6px 12px", backgroundColor: COLORS.cream, color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 6, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: fontBody }}>
+                      Return
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+};
+
+// ============================================================
+// SMART BUDGET RECOMMENDATIONS
+// ============================================================
+
+const MiniBarChart = ({ history }) => (
+  <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 36, width: 90 }}>
+    {history.map((v, i) => {
+      const color = v > 100 ? COLORS.red : v < 65 ? COLORS.amber : COLORS.green;
+      const heightPct = Math.min(v, 110) / 110 * 100;
+      return (
+        <div key={i} style={{ width: 10, height: `${heightPct}%`, backgroundColor: color, borderRadius: 2, opacity: 0.85 }} title={`Month ${i + 1}: ${v}%`} />
+      );
+    })}
+  </div>
+);
+
+const REC_TONE = {
+  reduce: { color: COLORS.amber, label: "REDUCE", pillTone: "warn" },
+  increase: { color: COLORS.copper, label: "INCREASE", pillTone: "copper" },
+  volatile: { color: COLORS.red, label: "VOLATILE", pillTone: "danger" },
+  "on-track": { color: COLORS.green, label: "ON TRACK", pillTone: "success" },
+};
+
+const RecommendationsSection = ({ ministries, updateMinistryBudget }) => {
+  const [applied, setApplied] = useState({});
+  const [dismissed, setDismissed] = useState({});
+  const [showOnTrack, setShowOnTrack] = useState(false);
+
+  // Re-classify against current ministries (uses live budget for delta computation).
+  const classified = ministries.map((m) => ({ ministry: m, ...classifyMinistry(m) }));
+  const groups = {
+    reduce: classified.filter((c) => c.type === "reduce" && !dismissed[c.ministry.id]),
+    increase: classified.filter((c) => c.type === "increase" && !dismissed[c.ministry.id]),
+    volatile: classified.filter((c) => c.type === "volatile" && !dismissed[c.ministry.id]),
+    "on-track": classified.filter((c) => c.type === "on-track"),
+  };
+
+  const totalReduceSavings = groups.reduce.reduce((s, c) => s + Math.max(0, -c.delta), 0);
+  const totalIncrease = groups.increase.reduce((s, c) => s + Math.max(0, c.delta), 0);
+  const netSavings = totalReduceSavings - totalIncrease;
+
+  const apply = (c) => {
+    if (c.suggestedBudget != null) updateMinistryBudget(c.ministry.id, c.suggestedBudget);
+    setApplied((a) => ({ ...a, [c.ministry.id]: true }));
+  };
+  const dismiss = (id) => setDismissed((d) => ({ ...d, [id]: true }));
+  const applyAll = () => {
+    const next = { ...applied };
+    for (const c of [...groups.reduce, ...groups.increase]) {
+      if (c.suggestedBudget != null) updateMinistryBudget(c.ministry.id, c.suggestedBudget);
+      next[c.ministry.id] = true;
+    }
+    setApplied(next);
+  };
+
+  const renderRow = (c) => {
+    const tone = REC_TONE[c.type];
+    const isApplied = applied[c.ministry.id];
+    return (
+      <div key={c.ministry.id} style={{
+        padding: 16, borderRadius: 10, backgroundColor: COLORS.cream,
+        border: `1px solid ${COLORS.borderSoft}`,
+        display: "grid", gridTemplateColumns: "auto 1fr 110px 180px 200px", gap: 16, alignItems: "center",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: c.ministry.color + "20", color: c.ministry.color, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fontDisplay, fontSize: 17, fontWeight: 600 }}>
+            {c.ministry.icon}
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink }}>{c.ministry.name}</div>
+            <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+              <Pill tone={tone.pillTone}>{tone.label}</Pill>
+              {c.confidence !== "—" && (
+                <span style={{ fontSize: 9, color: COLORS.inkSoft, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, padding: "2px 7px", border: `1px solid ${COLORS.border}`, borderRadius: 99 }}>
+                  {c.confidence}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div style={{ fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.5, fontStyle: "italic" }}>
+          {c.reasoning}
+        </div>
+        <MiniBarChart history={c.history} />
+        <div>
+          {c.suggestedBudget != null ? (
+            <>
+              <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Proposed</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, fontFamily: fontBody, fontVariantNumeric: "tabular-nums" }}>
+                {fmtShort(c.ministry.budget)} → {fmtShort(c.suggestedBudget)}
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: c.delta < 0 ? COLORS.green : COLORS.copper, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>
+                {c.delta < 0 ? "−" : "+"}{fmt(Math.abs(c.delta))}/year
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: 11, color: COLORS.inkSoft, fontStyle: "italic" }}>Investigate, no suggestion yet</div>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          {isApplied ? (
+            <Pill tone="success">✓ Applied to 2026</Pill>
+          ) : c.suggestedBudget != null ? (
+            <>
+              <button onClick={() => apply(c)} style={{ padding: "8px 14px", backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 7, fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>
+                Apply
+              </button>
+              <button onClick={() => dismiss(c.ministry.id)} style={{ padding: "8px 14px", backgroundColor: "transparent", color: COLORS.inkSoft, border: `1px solid ${COLORS.border}`, borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>
+                Dismiss
+              </button>
+            </>
+          ) : (
+            <button onClick={() => dismiss(c.ministry.id)} style={{ padding: "8px 14px", backgroundColor: "transparent", color: COLORS.inkSoft, border: `1px solid ${COLORS.border}`, borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>
+              Dismiss
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <Card style={{ padding: 28 }}>
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontFamily: fontSerif, fontSize: 30, fontWeight: 400, color: COLORS.ink, fontStyle: "italic", letterSpacing: -0.5 }}>
+          Smart budget recommendations.
+        </div>
+        <div style={{ fontFamily: fontSerif, fontSize: 16, fontStyle: "italic", color: COLORS.inkSoft, marginTop: 4 }}>
+          We analyzed 6 months of spending across all {ministries.length} ministries. Here's what to adjust for next year.
+        </div>
+      </div>
+
+      {/* SUMMARY BAR */}
+      <div style={{ padding: 18, backgroundColor: COLORS.cream, borderRadius: 10, marginBottom: 22, display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 11, color: COLORS.amber, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>To reduce</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 600, color: COLORS.ink, marginTop: 2 }}>{groups.reduce.length}</div>
+          <div style={{ fontSize: 11, color: COLORS.amber, fontWeight: 600 }}>−{fmt(totalReduceSavings)}/yr</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>To increase</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 600, color: COLORS.ink, marginTop: 2 }}>{groups.increase.length}</div>
+          <div style={{ fontSize: 11, color: COLORS.copper, fontWeight: 600 }}>+{fmt(totalIncrease)}/yr</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: COLORS.red, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Review</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 600, color: COLORS.ink, marginTop: 2 }}>{groups.volatile.length}</div>
+          <div style={{ fontSize: 11, color: COLORS.red, fontWeight: 600 }}>volatile patterns</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: COLORS.green, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>On track</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 600, color: COLORS.ink, marginTop: 2 }}>{groups["on-track"].length}</div>
+          <div style={{ fontSize: 11, color: COLORS.green, fontWeight: 600 }}>well-managed</div>
+        </div>
+        <button onClick={applyAll} style={{ marginLeft: "auto", padding: "12px 22px", backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6 }}>
+          <Sparkles size={14} /> Apply all · save {fmt(netSavings)}/yr
+        </button>
+      </div>
+
+      {/* GROUPED RECS */}
+      {["reduce", "increase", "volatile"].map((groupKey) => {
+        const list = groups[groupKey];
+        if (list.length === 0) return null;
+        const tone = REC_TONE[groupKey];
+        return (
+          <div key={groupKey} style={{ marginBottom: 22 }}>
+            <div style={{ fontSize: 11, color: tone.color, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700, marginBottom: 10 }}>
+              {tone.label} <span style={{ color: COLORS.inkSoft, fontWeight: 600 }}>({list.length})</span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {list.map(renderRow)}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* ON TRACK COLLAPSIBLE */}
+      <button
+        onClick={() => setShowOnTrack(!showOnTrack)}
+        style={{ width: "100%", padding: "14px 18px", backgroundColor: COLORS.cream, border: `1px solid ${COLORS.border}`, borderRadius: 10, cursor: "pointer", fontFamily: fontBody, color: COLORS.ink, fontWeight: 600, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "space-between" }}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <CheckCircle2 size={14} color={COLORS.green} />
+          {groups["on-track"].length} ministries on track — keep budgets as-is
+        </span>
+        <ChevronRight size={14} style={{ transform: showOnTrack ? "rotate(90deg)" : "none", transition: "transform 0.15s" }} />
+      </button>
+      {showOnTrack && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, marginTop: 10 }}>
+          {groups["on-track"].map((c) => (
+            <div key={c.ministry.id} style={{ padding: 12, backgroundColor: COLORS.cream, borderRadius: 8, border: `1px solid ${COLORS.borderSoft}`, display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 26, height: 26, borderRadius: 6, backgroundColor: c.ministry.color + "20", color: c.ministry.color, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fontDisplay, fontSize: 14, fontWeight: 600 }}>
+                {c.ministry.icon}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.ink }}>{c.ministry.name}</div>
+                <div style={{ fontSize: 11, color: COLORS.inkSoft }}>{Math.round(c.avg)}% avg utilization · {c.reasoning}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+};
+
+// ============================================================
+// VARIANCE STATS
+// ============================================================
+
+const VarianceSection = ({ ministries }) => {
+  const totalBudget = ministries.reduce((s, m) => s + m.budget, 0);
+  const totalSpent = ministries.reduce((s, m) => s + m.spent, 0);
+  const unused = totalBudget - totalSpent;
+  const utilizationPct = (totalSpent / totalBudget) * 100;
+  const variance = 100 - utilizationPct;
+
+  const sorted = [...ministries].map((m) => ({ ...m, pct: (m.spent / m.budget) * 100 }));
+  // Best discipline = highest utilization without exceeding 100
+  const bestDiscipline = sorted.filter((m) => m.pct <= 100).sort((a, b) => b.pct - a.pct)[0];
+  // Most underused = lowest utilization
+  const mostUnderused = sorted.sort((a, b) => a.pct - b.pct)[0];
+
+  // Total potential savings = sum of reduce-recommendation deltas
+  const reduceCandidates = ministries.map((m) => ({ m, c: classifyMinistry(m) })).filter((x) => x.c.type === "reduce");
+  const totalSavings = reduceCandidates.reduce((s, x) => s + Math.max(0, -x.c.delta), 0);
+
+  return (
+    <Card style={{ padding: 28 }}>
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontFamily: fontSerif, fontSize: 30, fontWeight: 400, color: COLORS.ink, fontStyle: "italic", letterSpacing: -0.5 }}>
+          Budget variance · year-to-date.
+        </div>
+        <div style={{ fontFamily: fontSerif, fontSize: 16, fontStyle: "italic", color: COLORS.inkSoft, marginTop: 4 }}>
+          Where the church is over-, under-, and right-on-budget.
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 22 }}>
+        <div style={{ padding: 18, backgroundColor: COLORS.cream, borderRadius: 10 }}>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Total budgeted</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 600, color: COLORS.ink, marginTop: 4, letterSpacing: -0.5 }}>{fmtShort(totalBudget)}</div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>across {ministries.length} ministries</div>
+        </div>
+        <div style={{ padding: 18, backgroundColor: COLORS.cream, borderRadius: 10 }}>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Actually used</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 600, color: COLORS.ink, marginTop: 4, letterSpacing: -0.5 }}>{fmtShort(totalSpent)}</div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>{utilizationPct.toFixed(1)}% of budget</div>
+        </div>
+        <div style={{ padding: 18, backgroundColor: "rgba(212,255,0,0.08)", borderRadius: 10, border: `1px solid ${COLORS.forest}40` }}>
+          <div style={{ fontSize: 11, color: COLORS.forest, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Unused funds</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 600, color: COLORS.forest, marginTop: 4, letterSpacing: -0.5 }}>{fmtShort(unused)}</div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>available to redirect</div>
+        </div>
+        <div style={{ padding: 18, backgroundColor: COLORS.cream, borderRadius: 10 }}>
+          <div style={{ fontSize: 11, color: COLORS.amber, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Variance</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 600, color: COLORS.amber, marginTop: 4, letterSpacing: -0.5 }}>{variance.toFixed(1)}%</div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>good forecast, room to tighten</div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+        <div style={{ padding: 18, borderRadius: 10, border: `1px solid ${COLORS.green}40`, backgroundColor: "rgba(74,222,128,0.06)" }}>
+          <div style={{ fontSize: 11, color: COLORS.green, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>🏆 Best discipline</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 600, color: COLORS.ink, marginTop: 6 }}>{bestDiscipline.name}</div>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 4 }}>
+            {Math.round(bestDiscipline.pct)}% used — close to budget without exceeding
+          </div>
+        </div>
+        <div style={{ padding: 18, borderRadius: 10, border: `1px solid ${COLORS.amber}40`, backgroundColor: "rgba(251,191,36,0.06)" }}>
+          <div style={{ fontSize: 11, color: COLORS.amber, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>📉 Most underused</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 600, color: COLORS.ink, marginTop: 6 }}>{mostUnderused.name}</div>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 4 }}>
+            Only {Math.round(mostUnderused.pct)}% spent — major reduction candidate
+          </div>
+        </div>
+        <div style={{ padding: 18, borderRadius: 10, border: `1px solid ${COLORS.copper}40`, backgroundColor: "rgba(255,90,31,0.06)" }}>
+          <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>💰 Total potential savings</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 600, color: COLORS.ink, marginTop: 6 }}>{fmt(totalSavings)}/year</div>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 4 }}>
+            apply all {reduceCandidates.length} reduction recs to free this up
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
+// ============================================================
 // BUDGET PAGE
 // ============================================================
 
-const BudgetPage = () => {
+const BudgetPage = ({ ministries, updateMinistryBudget }) => {
   const [alerts, setAlerts] = useState({
     donationsBelowOverhead: true,
     ministryOverBudget: true,
@@ -1169,6 +1652,15 @@ const BudgetPage = () => {
         </Card>
       </div>
 
+      {/* END-OF-MONTH RECONCILIATION */}
+      <ReconciliationSection ministries={ministries} />
+
+      {/* SMART RECOMMENDATIONS */}
+      <RecommendationsSection ministries={ministries} updateMinistryBudget={updateMinistryBudget} />
+
+      {/* VARIANCE STATS */}
+      <VarianceSection ministries={ministries} />
+
       {/* MONTHLY OVERHEAD SETUP */}
       <Card style={{ padding: 28 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
@@ -1225,7 +1717,7 @@ const BudgetPage = () => {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginTop: 18 }}>
-          <div style={{ padding: 18, borderRadius: 12, border: `1px solid ${COLORS.red}30`, backgroundColor: "#F4D9D540" }}>
+          <div style={{ padding: 18, borderRadius: 12, border: `1px solid ${COLORS.red}30`, backgroundColor: "rgba(255,59,138,0.10)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
               <Flame size={14} color={COLORS.red} />
               <div style={{ fontSize: 11, color: COLORS.red, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Survival Floor</div>
@@ -1233,7 +1725,7 @@ const BudgetPage = () => {
             <div style={{ fontFamily: fontDisplay, fontSize: 30, fontWeight: 500, color: COLORS.ink, letterSpacing: -0.7 }}>{fmtShort(SURVIVAL_FLOOR_MO)}<span style={{ fontSize: 16, color: COLORS.inkSoft, fontWeight: 400 }}>/mo</span></div>
             <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 4 }}>If everything else stops — facilities + people only.</div>
           </div>
-          <div style={{ padding: 18, borderRadius: 12, border: `1px solid ${COLORS.amber}30`, backgroundColor: "#FBE8D040" }}>
+          <div style={{ padding: 18, borderRadius: 12, border: `1px solid ${COLORS.amber}30`, backgroundColor: "rgba(251,191,36,0.10)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
               <Gauge size={14} color={COLORS.amber} />
               <div style={{ fontSize: 11, color: COLORS.amber, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Operating Overhead</div>
@@ -1271,7 +1763,7 @@ const BudgetPage = () => {
             );
           })}
         </div>
-        <div style={{ marginTop: 14, padding: 14, backgroundColor: COLORS.forestDeep, color: COLORS.cream, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ marginTop: 14, padding: 14, backgroundColor: COLORS.forestDeep, color: COLORS.ink, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <TrendingDown size={16} color={COLORS.copper} />
             <div style={{ fontSize: 13 }}>vs. 2025 actual ({fmt(TOTAL_EXPENSES)}) — projecting</div>
@@ -1348,17 +1840,17 @@ const BudgetPage = () => {
             );
           })}
         </div>
-        <div style={{ marginTop: 16, padding: 18, backgroundColor: COLORS.forestDeep, color: COLORS.cream, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ marginTop: 16, padding: 18, backgroundColor: COLORS.forestDeep, color: COLORS.ink, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <AlertTriangle size={20} color={COLORS.copper} />
             <div>
               <div style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 500, fontStyle: "italic" }}>Worst-case runway</div>
-              <div style={{ fontSize: 12, color: "rgba(244,236,220,0.7)" }}>If giving stopped tomorrow and you ran on essentials only.</div>
+              <div style={{ fontSize: 12, color: "rgba(250,250,250,0.7)" }}>If giving stopped tomorrow and you ran on essentials only.</div>
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontFamily: fontDisplay, fontSize: 32, fontWeight: 500, color: COLORS.copper, letterSpacing: -0.7 }}>{runway2026Worst.toFixed(1)} months</div>
-            <div style={{ fontSize: 11, color: "rgba(244,236,220,0.6)" }}>{fmt(BALANCE_END)} reserves ÷ {fmtShort(SURVIVAL_FLOOR_MO)}/mo</div>
+            <div style={{ fontSize: 11, color: "rgba(250,250,250,0.6)" }}>{fmt(BALANCE_END)} reserves ÷ {fmtShort(SURVIVAL_FLOOR_MO)}/mo</div>
           </div>
         </div>
       </Card>
@@ -1412,7 +1904,7 @@ const BudgetPage = () => {
 
         <ThresholdsPanel config={alertConfig} alerts={alerts} updateThreshold={updateThreshold} />
 
-        <AlertsLivePanel alerts={alerts} config={alertConfig} />
+        <AlertsLivePanel alerts={alerts} config={alertConfig} ministries={ministries} />
       </Card>
 
     </div>
@@ -1423,11 +1915,176 @@ const BudgetPage = () => {
 // MINISTRIES PAGE
 // ============================================================
 
-const MinistriesPage = ({ openReceiptModal }) => {
+const MinistriesPage = ({ openReceiptModal, ministries, addMinistry }) => {
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newBudget, setNewBudget] = useState("");
+  const [newLeader, setNewLeader] = useState("");
+  const [recent, setRecent] = useState(null); // { id, name } of last-added, for flash banner
+
+  const canSubmit = newName.trim().length > 0 && Number(newBudget) > 0;
+
+  const handleAdd = () => {
+    if (!canSubmit) return;
+    const id = addMinistry({ name: newName.trim(), budget: Number(newBudget), leader: newLeader.trim() });
+    setRecent({ id, name: newName.trim() });
+    setNewName("");
+    setNewBudget("");
+    setNewLeader("");
+    setAdding(false);
+  };
+
+  const cancel = () => {
+    setNewName("");
+    setNewBudget("");
+    setNewLeader("");
+    setAdding(false);
+  };
+
   return (
-    <div style={{ padding: "32px 36px" }}>
+    <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* HEADER */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 24, fontWeight: 600, color: COLORS.ink, letterSpacing: -0.5 }}>
+            All ministries
+          </div>
+          <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 2 }}>
+            {ministries.length} active · upload receipts on any card · new ministries land unassigned
+          </div>
+        </div>
+        {!adding && (
+          <button onClick={() => setAdding(true)} style={{
+            display: "flex", alignItems: "center", gap: 6, backgroundColor: COLORS.forest,
+            color: COLORS.bg, border: "none", padding: "10px 18px", borderRadius: 9,
+            fontSize: 13, fontFamily: fontBody, fontWeight: 700, cursor: "pointer",
+          }}>
+            <Plus size={14} /> New ministry
+          </button>
+        )}
+      </div>
+
+      {/* RECENT-ADDED FLASH */}
+      {recent && (
+        <Card style={{
+          padding: 14, backgroundColor: "rgba(212,255,0,0.06)", borderColor: COLORS.forest + "60",
+          display: "flex", alignItems: "center", gap: 12,
+        }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 7, backgroundColor: COLORS.forest, color: COLORS.bg,
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <Check size={14} strokeWidth={3} />
+          </div>
+          <div style={{ flex: 1, fontSize: 13, color: COLORS.ink }}>
+            <strong>{recent.name}</strong> added — currently unassigned.{" "}
+            <span style={{ color: COLORS.inkSoft }}>
+              Go to <strong style={{ color: COLORS.forest }}>Administrators</strong> to assign it to a leader.
+            </span>
+          </div>
+          <button onClick={() => setRecent(null)} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: COLORS.inkSoft }}>
+            <X size={16} />
+          </button>
+        </Card>
+      )}
+
+      {/* INLINE NEW-MINISTRY FORM */}
+      {adding && (
+        <Card style={{
+          padding: 22, position: "relative", overflow: "hidden",
+          borderColor: COLORS.forest + "60",
+        }}>
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, backgroundColor: COLORS.forest }} />
+          <div style={{ marginBottom: 16, marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: COLORS.forest, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>
+              New ministry
+            </div>
+            <div style={{ fontFamily: fontSerif, fontSize: 18, fontStyle: "italic", color: COLORS.inkSoft, marginTop: 4 }}>
+              Name it, set the annual budget, and we'll add it to the master list.
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 12, marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600, marginBottom: 4 }}>Ministry name *</div>
+              <input
+                autoFocus
+                placeholder="e.g. Prayer Team"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && canSubmit) handleAdd(); if (e.key === "Escape") cancel(); }}
+                style={{
+                  width: "100%", padding: "10px 12px", fontSize: 14, fontWeight: 600,
+                  fontFamily: fontBody, color: COLORS.ink, background: COLORS.surface,
+                  border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+                }}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600, marginBottom: 4 }}>Annual budget * ($)</div>
+              <input
+                type="number"
+                placeholder="5000"
+                value={newBudget}
+                onChange={(e) => setNewBudget(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && canSubmit) handleAdd(); if (e.key === "Escape") cancel(); }}
+                style={{
+                  width: "100%", padding: "10px 12px", fontSize: 14, fontWeight: 600,
+                  fontFamily: fontBody, color: COLORS.ink, background: COLORS.surface,
+                  border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600, marginBottom: 4 }}>Leader (optional)</div>
+              <input
+                placeholder="e.g. Sarah K."
+                value={newLeader}
+                onChange={(e) => setNewLeader(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && canSubmit) handleAdd(); if (e.key === "Escape") cancel(); }}
+                style={{
+                  width: "100%", padding: "10px 12px", fontSize: 14, fontWeight: 600,
+                  fontFamily: fontBody, color: COLORS.ink, background: COLORS.surface,
+                  border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+                }}
+              />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              onClick={handleAdd}
+              disabled={!canSubmit}
+              style={{
+                padding: "10px 20px", border: "none", borderRadius: 9, fontFamily: fontBody, fontWeight: 700,
+                fontSize: 13, cursor: canSubmit ? "pointer" : "not-allowed",
+                backgroundColor: canSubmit ? COLORS.forest : COLORS.cream,
+                color: canSubmit ? COLORS.bg : COLORS.inkSoft,
+                display: "flex", alignItems: "center", gap: 6,
+              }}
+            >
+              <Plus size={14} /> Add to ministries
+            </button>
+            <button
+              onClick={cancel}
+              style={{
+                padding: "10px 16px", border: `1px solid ${COLORS.border}`, borderRadius: 9,
+                fontFamily: fontBody, fontWeight: 600, fontSize: 13, cursor: "pointer",
+                backgroundColor: "transparent", color: COLORS.ink,
+              }}
+            >
+              Cancel
+            </button>
+            <span style={{ fontSize: 11, color: COLORS.inkSoft, marginLeft: 8 }}>
+              Press Enter to add · Esc to cancel
+            </span>
+          </div>
+        </Card>
+      )}
+
+      {/* GRID */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-        {MINISTRIES.map((m) => {
+        {ministries.map((m) => {
           const pct = (m.spent / m.budget) * 100;
           const remaining = m.budget - m.spent;
           return (
@@ -1545,9 +2202,9 @@ const CampusesPage = () => {
 // ============================================================
 
 const ADMIN_TYPE_TONE = {
-  executive: { color: COLORS.forest, bg: "#DDEDE0", label: "Executive" },
-  function: { color: COLORS.copper, bg: "#E8C9A8", label: "Function" },
-  campus: { color: COLORS.amber, bg: "#FBE8D0", label: "Campus" },
+  executive: { color: COLORS.forest, bg: "rgba(74,222,128,0.16)", label: "Executive" },
+  function: { color: COLORS.copper, bg: "rgba(255,90,31,0.18)", label: "Function" },
+  campus: { color: COLORS.amber, bg: "rgba(251,191,36,0.18)", label: "Campus" },
 };
 
 // Computes per-admin totals from current assignments.
@@ -1558,7 +2215,7 @@ const computeOversight = (adminId, assignments, ministriesList) => {
   return { ministries, budget, spent };
 };
 
-const NEW_MINISTRY_PALETTE = ["#1F3A34", "#2D6A4F", "#52796F", "#84A98C", "#B8855E", "#C97B2F", "#D4A373", "#9B7B5A", "#A98467"];
+const NEW_MINISTRY_PALETTE = ["#D4FF00", "#FF5A1F", "#FF3B8A", "#FBBF24", "#A78BFA", "#22D3EE", "#F472B6", "#4ADE80", "#60A5FA"];
 const NEW_MINISTRY_ICONS = ["○", "◆", "▲", "■", "♦", "★", "✦", "◈", "◇"];
 
 const slugify = (s) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `m-${Date.now()}`;
@@ -1600,7 +2257,7 @@ const AssignmentModal = ({ admin, assignments, ministries, renameMinistry, updat
 
         <div style={{ padding: "24px 28px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ width: 44, height: 44, borderRadius: "50%", backgroundColor: COLORS.forest, color: COLORS.cream, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>{admin.avatar}</div>
+            <div style={{ width: 44, height: 44, borderRadius: "50%", backgroundColor: COLORS.forest, color: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>{admin.avatar}</div>
             <div>
               <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 500, color: COLORS.ink, fontStyle: "italic", letterSpacing: -0.3 }}>Assign ministries to {admin.name}</div>
               <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>Click any ministry to toggle. Selecting one already assigned transfers it.</div>
@@ -1622,7 +2279,7 @@ const AssignmentModal = ({ admin, assignments, ministries, renameMinistry, updat
               const isUnassigned = !currentOwner;
 
               const borderColor = isSelected ? COLORS.green : isOther ? COLORS.amber : COLORS.border;
-              const bg = isSelected ? "#DDEDE040" : isOther ? "#FBE8D040" : COLORS.surface;
+              const bg = isSelected ? "rgba(74,222,128,0.10)" : isOther ? "rgba(251,191,36,0.10)" : COLORS.surface;
 
               return (
                 <div
@@ -1725,7 +2382,7 @@ const AssignmentModal = ({ admin, assignments, ministries, renameMinistry, updat
                       flex: 1, padding: "7px 10px", border: "none", borderRadius: 6, fontFamily: fontBody, fontWeight: 700,
                       fontSize: 12, cursor: newName.trim() && Number(newBudgetInput) ? "pointer" : "not-allowed",
                       backgroundColor: newName.trim() && Number(newBudgetInput) ? COLORS.forest : COLORS.border,
-                      color: COLORS.cream,
+                      color: COLORS.ink,
                     }}
                   >
                     Add
@@ -1752,7 +2409,7 @@ const AssignmentModal = ({ admin, assignments, ministries, renameMinistry, updat
             <button onClick={onClose} style={{ padding: "10px 18px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody }}>
               Cancel
             </button>
-            <button onClick={() => { onSave(selected); onClose(); }} style={{ padding: "10px 20px", backgroundColor: COLORS.forest, color: COLORS.cream, border: "none", borderRadius: 9, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6 }}>
+            <button onClick={() => { onSave(selected); onClose(); }} style={{ padding: "10px 20px", backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 9, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6 }}>
               <Check size={14} /> Save assignments
             </button>
           </div>
@@ -1762,61 +2419,17 @@ const AssignmentModal = ({ admin, assignments, ministries, renameMinistry, updat
   );
 };
 
-const AdministratorsPage = () => {
+const AdministratorsPage = ({
+  ministries, admins,
+  renameMinistry, updateMinistryBudget, addMinistry,
+  renameAdmin, updateAdminTitle, addAdmin,
+}) => {
   const [assignments, setAssignments] = useState(INITIAL_ASSIGNMENTS);
   const [filter, setFilter] = useState("all");
   const [editing, setEditing] = useState(null);
-  const [ministries, setMinistries] = useState(MINISTRIES);
-  const [admins, setAdmins] = useState(ADMINISTRATORS);
 
   // Keep `editing` reference in sync if its admin object changes (after rename).
   const editingAdmin = editing ? admins.find((a) => a.id === editing.id) : null;
-
-  const renameMinistry = (id, name) => {
-    setMinistries((prev) => prev.map((m) => (m.id === id ? { ...m, name } : m)));
-  };
-  const updateMinistryBudget = (id, budget) => {
-    setMinistries((prev) => prev.map((m) => (m.id === id ? { ...m, budget } : m)));
-  };
-  const addMinistry = ({ name, budget }) => {
-    const id = slugify(name);
-    let uniqueId = id;
-    let i = 2;
-    while (ministries.some((m) => m.id === uniqueId)) uniqueId = `${id}-${i++}`;
-    const idx = ministries.length;
-    const ministry = {
-      id: uniqueId,
-      name,
-      budget,
-      spent: 0,
-      leader: "",
-      campus: "main",
-      color: NEW_MINISTRY_PALETTE[idx % NEW_MINISTRY_PALETTE.length],
-      icon: NEW_MINISTRY_ICONS[idx % NEW_MINISTRY_ICONS.length],
-    };
-    setMinistries((prev) => [...prev, ministry]);
-    return uniqueId;
-  };
-
-  const renameAdmin = (id, name) => {
-    setAdmins((prev) => prev.map((a) => (a.id === id ? { ...a, name } : a)));
-  };
-  const updateAdminTitle = (id, title) => {
-    setAdmins((prev) => prev.map((a) => (a.id === id ? { ...a, title } : a)));
-  };
-  const addAdmin = () => {
-    const id = `admin-${Date.now()}`;
-    const newAdmin = {
-      id,
-      name: "New Administrator",
-      avatar: "NA",
-      type: "function",
-      campus: "Main",
-      title: "Click title to edit",
-      bio: "Click any name to rename.",
-    };
-    setAdmins((prev) => [...prev, newAdmin]);
-  };
 
   const stats = useMemo(() => {
     const totalBudget = admins.reduce((s, a) => s + computeOversight(a.id, assignments, ministries).budget, 0);
@@ -1863,7 +2476,7 @@ const AdministratorsPage = () => {
           <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 500, color: COLORS.ink, marginTop: 6, letterSpacing: -0.5 }}>{fmtShort(stats.totalBudget)}</div>
           <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>across all ministries</div>
         </Card>
-        <Card style={{ padding: 22, backgroundColor: stats.unassigned.length === 0 ? COLORS.surface : "#FBE8D040", borderColor: stats.unassigned.length === 0 ? COLORS.border : COLORS.amber + "60" }}>
+        <Card style={{ padding: 22, backgroundColor: stats.unassigned.length === 0 ? COLORS.surface : "rgba(251,191,36,0.10)", borderColor: stats.unassigned.length === 0 ? COLORS.border : COLORS.amber + "60" }}>
           <div style={{ fontSize: 11, color: stats.unassigned.length === 0 ? COLORS.inkSoft : COLORS.amber, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Coverage</div>
           <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 500, color: COLORS.ink, marginTop: 6, letterSpacing: -0.5 }}>
             {stats.assignedCount} <span style={{ color: COLORS.inkSoft, fontSize: 18 }}>/ {ministries.length}</span>
@@ -1881,7 +2494,7 @@ const AdministratorsPage = () => {
 
       {/* UNASSIGNED WARNING */}
       {stats.unassigned.length > 0 && (
-        <Card style={{ padding: 16, backgroundColor: "#FBE8D040", borderColor: COLORS.amber + "60", display: "flex", alignItems: "center", gap: 12 }}>
+        <Card style={{ padding: 16, backgroundColor: "rgba(251,191,36,0.10)", borderColor: COLORS.amber + "60", display: "flex", alignItems: "center", gap: 12 }}>
           <AlertTriangle size={18} color={COLORS.amber} />
           <div style={{ flex: 1, fontSize: 13, color: COLORS.ink }}>
             <strong>{stats.unassigned.length} ministr{stats.unassigned.length === 1 ? "y has" : "ies have"} no administrator:</strong>{" "}
@@ -1919,7 +2532,7 @@ const AdministratorsPage = () => {
             </button>
           ))}
         </div>
-        <button onClick={addAdmin} style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: COLORS.cream, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
+        <button onClick={addAdmin} style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: COLORS.bg, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
           <UserPlus size={14} /> Add administrator
         </button>
       </div>
@@ -2047,7 +2660,7 @@ const AdministratorsPage = () => {
 const EventsPage = () => {
   const typeColor = {
     camp: COLORS.forest, retreat: COLORS.green, conference: COLORS.copper,
-    school: COLORS.amber, event: "#52796F", meeting: COLORS.inkSoft,
+    school: COLORS.amber, event: "#22D3EE", meeting: COLORS.inkSoft,
   };
   return (
     <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 20 }}>
@@ -2072,7 +2685,7 @@ const EventsPage = () => {
             <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 500, color: COLORS.ink, fontStyle: "italic" }}>All events & camps</div>
             <div style={{ fontSize: 12, color: COLORS.inkSoft }}>Track registration, attendance, and budgets</div>
           </div>
-          <button style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: COLORS.cream, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
+          <button style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: COLORS.bg, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
             <Plus size={14} /> New event
           </button>
         </div>
@@ -2111,13 +2724,13 @@ const ReceiptsPage = ({ openReceiptModal }) => {
   return (
     <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 20 }}>
       <Card style={{
-        padding: 32, backgroundColor: COLORS.forestDeep, color: COLORS.cream, border: "none",
+        padding: 32, backgroundColor: COLORS.forestDeep, color: COLORS.ink, border: "none",
         backgroundImage: `radial-gradient(circle at 80% 20%, rgba(184,133,94,0.15) 0%, transparent 50%)`
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
             <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 500, fontStyle: "italic", letterSpacing: -0.5 }}>Snap a receipt, we'll do the rest.</div>
-            <div style={{ fontSize: 13, color: "rgba(244,236,220,0.75)", marginTop: 6, maxWidth: 540 }}>
+            <div style={{ fontSize: 13, color: "rgba(250,250,250,0.75)", marginTop: 6, maxWidth: 540 }}>
               Upload a photo or PDF. AI extracts vendor, amount, and date — auto-codes it to the right ministry, then syncs to QuickBooks once approved.
             </div>
           </div>
@@ -2217,7 +2830,7 @@ const PeoplePage = () => {
             <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 500, color: COLORS.ink, fontStyle: "italic" }}>Team & access</div>
             <div style={{ fontSize: 12, color: COLORS.inkSoft }}>{TEAM.length} active members · invite ministry leaders with limited access</div>
           </div>
-          <button style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: COLORS.cream, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
+          <button style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: COLORS.bg, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
             <UserPlus size={14} /> Invite member
           </button>
         </div>
@@ -2228,7 +2841,7 @@ const PeoplePage = () => {
         {TEAM.map((p, i) => (
           <div key={i} style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr 80px", gap: 12, padding: 14, borderBottom: `1px solid ${COLORS.borderSoft}`, alignItems: "center" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 38, height: 38, borderRadius: "50%", backgroundColor: COLORS.forest, color: COLORS.cream, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13 }}>{p.avatar}</div>
+              <div style={{ width: 38, height: 38, borderRadius: "50%", backgroundColor: COLORS.forest, color: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13 }}>{p.avatar}</div>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{p.name}</div>
                 <div style={{ fontSize: 11, color: COLORS.inkSoft }}>{p.email}</div>
@@ -2401,7 +3014,7 @@ const IntegrationsPage = () => {
             <div style={{ display: "flex", gap: 8 }}>
               {int.connected ? (
                 <>
-                  <button style={{ flex: 1, padding: "9px 14px", backgroundColor: COLORS.forest, color: COLORS.cream, border: "none", borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                  <button style={{ flex: 1, padding: "9px 14px", backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                     <RefreshCw size={12} /> Sync now
                   </button>
                   <button style={{ padding: "9px 14px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>
@@ -2533,7 +3146,7 @@ const ReceiptModal = ({ ministry, onClose }) => {
               <div style={{ fontSize: 12, color: COLORS.inkSoft }}>or click to browse · jpg, png, pdf · up to 20 MB</div>
             </div>
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setStep(2)} style={{ flex: 1, padding: 12, backgroundColor: COLORS.forest, color: COLORS.cream, border: "none", borderRadius: 10, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, fontSize: 13 }}>
+              <button onClick={() => setStep(2)} style={{ flex: 1, padding: 12, backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 10, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, fontSize: 13 }}>
                 Use sample receipt →
               </button>
               <button onClick={onClose} style={{ padding: 12, backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 10, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, fontSize: 13 }}>
@@ -2564,7 +3177,7 @@ const ReceiptModal = ({ ministry, onClose }) => {
               ))}
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-              <button onClick={onClose} style={{ flex: 1, padding: 12, backgroundColor: COLORS.forest, color: COLORS.cream, border: "none", borderRadius: 10, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              <button onClick={onClose} style={{ flex: 1, padding: 12, backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 10, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                 <Check size={14} /> Submit & sync to QuickBooks
               </button>
               <button onClick={() => setStep(1)} style={{ padding: 12, backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 10, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, fontSize: 13 }}>
@@ -2587,6 +3200,45 @@ export default function IRCChurchApp() {
   const [activeCampus, setActiveCampus] = useState("all");
   const [receiptModal, setReceiptModal] = useState({ open: false, ministry: null });
 
+  // Lifted: ministries are the shared source of truth across Budget, Dashboard,
+  // Ministries, and Administrators pages. Recommendations Apply, ministry
+  // renames, and "+New ministry" all mutate this state and propagate everywhere.
+  const [ministries, setMinistries] = useState(MINISTRIES);
+  const [admins, setAdmins] = useState(ADMINISTRATORS);
+
+  const updateMinistryBudget = (id, budget) => {
+    setMinistries((prev) => prev.map((m) => (m.id === id ? { ...m, budget } : m)));
+  };
+  const renameMinistry = (id, name) => {
+    setMinistries((prev) => prev.map((m) => (m.id === id ? { ...m, name } : m)));
+  };
+  const addMinistry = ({ name, budget, leader = "" }) => {
+    const id = slugify(name);
+    let uniqueId = id;
+    let i = 2;
+    while (ministries.some((m) => m.id === uniqueId)) uniqueId = `${id}-${i++}`;
+    const idx = ministries.length;
+    const ministry = {
+      id: uniqueId, name, budget, spent: 0, leader, campus: "main",
+      color: NEW_MINISTRY_PALETTE[idx % NEW_MINISTRY_PALETTE.length],
+      icon: NEW_MINISTRY_ICONS[idx % NEW_MINISTRY_ICONS.length],
+    };
+    setMinistries((prev) => [...prev, ministry]);
+    return uniqueId;
+  };
+  const renameAdmin = (id, name) =>
+    setAdmins((prev) => prev.map((a) => (a.id === id ? { ...a, name } : a)));
+  const updateAdminTitle = (id, title) =>
+    setAdmins((prev) => prev.map((a) => (a.id === id ? { ...a, title } : a)));
+  const addAdmin = () => {
+    const id = `admin-${Date.now()}`;
+    setAdmins((prev) => [...prev, {
+      id, name: "New Administrator", avatar: "NA",
+      type: "function", campus: "Main", title: "Click title to edit",
+      bio: "Click any name to rename.",
+    }]);
+  };
+
   const titles = {
     dashboard: { t: "Dashboard", s: "IRC Church · Fiscal Year 2025 overview" },
     donations: { t: "Donations", s: "All giving · all sources · all campuses" },
@@ -2605,21 +3257,25 @@ export default function IRCChurchApp() {
   const content = useMemo(() => {
     const open = (m) => setReceiptModal({ open: true, ministry: m });
     switch (activePage) {
-      case "dashboard": return <DashboardPage />;
+      case "dashboard": return <DashboardPage ministries={ministries} />;
       case "donations": return <DonationsPage />;
       case "expenses": return <ExpensesPage />;
-      case "budget": return <BudgetPage />;
-      case "ministries": return <MinistriesPage openReceiptModal={open} />;
+      case "budget": return <BudgetPage ministries={ministries} updateMinistryBudget={updateMinistryBudget} />;
+      case "ministries": return <MinistriesPage openReceiptModal={open} ministries={ministries} addMinistry={addMinistry} />;
       case "campuses": return <CampusesPage />;
-      case "administrators": return <AdministratorsPage />;
+      case "administrators": return <AdministratorsPage
+        ministries={ministries} admins={admins}
+        renameMinistry={renameMinistry} updateMinistryBudget={updateMinistryBudget} addMinistry={addMinistry}
+        renameAdmin={renameAdmin} updateAdminTitle={updateAdminTitle} addAdmin={addAdmin}
+      />;
       case "events": return <EventsPage />;
       case "receipts": return <ReceiptsPage openReceiptModal={open} />;
       case "people": return <PeoplePage />;
       case "integrations": return <IntegrationsPage />;
       case "reports": return <ReportsPage />;
-      default: return <DashboardPage />;
+      default: return <DashboardPage ministries={ministries} />;
     }
-  }, [activePage]);
+  }, [activePage, ministries, admins]);
 
   return (
     <div style={{
@@ -2629,7 +3285,7 @@ export default function IRCChurchApp() {
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
       <link
-        href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500;1,9..144,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Manrope:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap"
         rel="stylesheet"
       />
       <style>{`
