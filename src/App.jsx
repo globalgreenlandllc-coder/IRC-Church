@@ -8,7 +8,7 @@ import {
   Edit3, Trash2, ChevronRight, Camera, Paperclip, X, Check, Lock,
   Sparkles, Activity, Church, MapPin, BarChart3, PieChart as PieIcon,
   RefreshCw, Link2, ExternalLink, Globe, Target, Gauge, AlertTriangle, Zap,
-  Flame, BellRing, Info
+  Flame, BellRing, Info, Repeat, CalendarDays, ChevronLeft
 } from "lucide-react";
 import {
   ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
@@ -232,6 +232,55 @@ const LAST_MONTH_SPEND = {
   services: 4920,
   target: 990,
   merch: 1015,
+};
+
+// Recurring payments — fire on a fixed day every month, auto-roll forward.
+const INITIAL_RECURRING_PAYMENTS = [
+  { id: "rent-everett",   name: "Everett Rent",                 amount: 24500, dayOfMonth: 1,  category: "facilities", note: "Main campus lease" },
+  { id: "rent-tacoma",    name: "Tacoma Rent",                  amount: 4200,  dayOfMonth: 1,  category: "facilities", note: null },
+  { id: "rent-nyc",       name: "NYC Rent",                     amount: 5800,  dayOfMonth: 1,  category: "facilities", note: null },
+  { id: "missions",       name: "Monthly Missions Support",     amount: 2500,  dayOfMonth: 1,  category: "ministry",   note: "Partner ministries" },
+  { id: "insurance",      name: "Insurance Premium",            amount: 2840,  dayOfMonth: 5,  category: "facilities", note: null },
+  { id: "cleaning",       name: "Cleaning Service",             amount: 1800,  dayOfMonth: 5,  category: "facilities", note: null },
+  { id: "utilities",      name: "Utilities (Electric + Gas)",   amount: 4200,  dayOfMonth: 8,  category: "facilities", note: null },
+  { id: "internet",       name: "Internet & Phone",             amount: 480,   dayOfMonth: 10, category: "operations", note: null },
+  { id: "software",       name: "Software Subscriptions",       amount: 320,   dayOfMonth: 12, category: "operations", note: "PCO, Canva, Mailchimp, Zoom" },
+  { id: "payroll-mid",    name: "Mid-month Payroll",            amount: 17500, dayOfMonth: 15, category: "people",     note: "8 staff" },
+  { id: "equipment",      name: "Equipment Lease",              amount: 850,   dayOfMonth: 15, category: "operations", note: "Audio booth + camera" },
+  { id: "office-supplies",name: "Office Supplies",              amount: 350,   dayOfMonth: 20, category: "operations", note: null },
+  { id: "bank-fees",      name: "Bank Fees",                    amount: 220,   dayOfMonth: 28, category: "operations", note: null },
+  { id: "payroll-end",    name: "End-month Payroll",            amount: 17500, dayOfMonth: 30, category: "people",     note: "8 staff" },
+];
+
+// One-time scheduled events with full date.
+const SCHEDULED_EVENTS = [
+  { id: "ev-mom",          name: "Mother's Day Service",       date: "2026-05-10", amount: 800,   note: "Flowers + program" },
+  { id: "ev-mens-bf",      name: "Men's Breakfast",            date: "2026-05-16", amount: 600,   note: null },
+  { id: "ev-memorial",     name: "Memorial Day Outreach",      date: "2026-05-25", amount: 1200,  note: null },
+  { id: "ev-youth-night",  name: "Youth Worship Night",        date: "2026-05-31", amount: 820,   note: null },
+  { id: "ev-grad",         name: "Graduation Service",         date: "2026-06-07", amount: 1100,  note: null },
+  { id: "ev-camp-deposit", name: "Summer Camp Deposit",        date: "2026-06-15", amount: 5000,  note: null },
+  { id: "ev-fathers",      name: "Father's Day Lunch",         date: "2026-06-21", amount: 1500,  note: null },
+  { id: "ev-july4",        name: "Independence Day Picnic",    date: "2026-07-04", amount: 1800,  note: null },
+  { id: "ev-summer-camp",  name: "Summer Youth Camp",          date: "2026-07-13", amount: 18000, note: "5-day camp · 50 youth" },
+  { id: "ev-vbs",          name: "Kids VBS Week",              date: "2026-07-20", amount: 4900,  note: "Vacation Bible School" },
+  { id: "ev-school-drive", name: "Back-to-School Drive",       date: "2026-08-15", amount: 2200,  note: "Backpacks + supplies" },
+  { id: "ev-mens-retreat", name: "Men's Retreat",              date: "2026-08-22", amount: 8500,  note: "Weekend retreat" },
+  { id: "ev-fall-kickoff", name: "Fall Kickoff",               date: "2026-09-06", amount: 2400,  note: null },
+  { id: "ev-marriage",     name: "Marriage Conference",        date: "2026-09-19", amount: 3200,  note: null },
+  { id: "ev-womens-conf",  name: "Women's Conference",         date: "2026-10-10", amount: 4800,  note: null },
+  { id: "ev-fall-fest",    name: "Fall Festival",              date: "2026-10-31", amount: 2800,  note: null },
+  { id: "ev-thanksgiving", name: "Thanksgiving Outreach",      date: "2026-11-22", amount: 1900,  note: "200 meals" },
+  { id: "ev-banquet",      name: "Year-End Banquet",           date: "2026-12-13", amount: 6400,  note: null },
+  { id: "ev-christmas",    name: "Christmas Service Production",date: "2026-12-24",amount: 7500,  note: "Live band, lights, video" },
+];
+
+const CALENDAR_CATEGORIES = {
+  facilities: { label: "Facilities",       color: "#FF5A1F" },  // orange
+  people:     { label: "People & Payroll", color: "#D4FF00" },  // lime
+  operations: { label: "Operations",       color: "#A78BFA" },  // purple
+  ministry:   { label: "Ministry",         color: "#FF3B8A" },  // pink
+  event:      { label: "Event",            color: "#FBBF24" },  // amber
 };
 
 // 6-month forecast per ministry — synthetic seasonal patterns.
@@ -461,6 +510,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
     { id: "donations", label: "Donations", icon: HandHeart },
     { id: "expenses", label: "Expenses", icon: Receipt },
     { id: "budget", label: "Budget", icon: Target },
+    { id: "calendar", label: "Calendar", icon: CalendarDays },
     { id: "ministries", label: "Ministries", icon: Users },
     { id: "campuses", label: "Campuses", icon: Building2 },
     { id: "administrators", label: "Administrators", icon: UserPlus },
@@ -621,20 +671,20 @@ const TopBar = ({ activeCampus, setActiveCampus, pageTitle, pageSubtitle }) => {
 // BUDGET HEALTH HERO CARD (Dashboard top)
 // ============================================================
 
-const BudgetHealthCard = ({ ministries }) => {
+const BudgetHealthCard = ({ ministries, operatingOverheadMo, survivalFloorMo }) => {
   const currentDonations = MONTHLY_TREND[MONTHLY_TREND.length - 1].donations;
   const currentExpenses = MONTHLY_TREND[MONTHLY_TREND.length - 1].expenses;
   const ministriesBudget = ministries.reduce((s, m) => s + m.budget, 0);
-  const operatingBudget = OPERATING_OVERHEAD_YR + ministriesBudget + EVENTS_BUDGET_YR + BLESSINGS_BUDGET_YR;
+  const operatingBudget = (operatingOverheadMo * 12) + ministriesBudget + EVENTS_BUDGET_YR + BLESSINGS_BUDGET_YR;
   const monthlyBudget = operatingBudget / 12;
   const cashOnHand = BALANCE_END;
 
-  const overheadCoverage = currentDonations / OPERATING_OVERHEAD_MO;
-  const surplusOverOverhead = currentDonations - OPERATING_OVERHEAD_MO;
-  const runwayMonths = cashOnHand / SURVIVAL_FLOOR_MO;
+  const overheadCoverage = currentDonations / operatingOverheadMo;
+  const surplusOverOverhead = currentDonations - operatingOverheadMo;
+  const runwayMonths = cashOnHand / survivalFloorMo;
 
   const donationsOK = currentDonations >= monthlyBudget * 0.85;
-  const overheadOK = currentDonations >= OPERATING_OVERHEAD_MO;
+  const overheadOK = currentDonations >= operatingOverheadMo;
   const runwayOK = runwayMonths >= 6;
   const passing = [donationsOK, overheadOK, runwayOK].filter(Boolean).length;
   const status = passing === 3 ? "on-track" : passing === 2 ? "caution" : "at-risk";
@@ -667,13 +717,13 @@ const BudgetHealthCard = ({ ministries }) => {
     {
       label: "Overhead coverage",
       value: `${overheadCoverage.toFixed(1)}×`,
-      sub: `${fmtShort(OPERATING_OVERHEAD_MO)}/mo target`,
+      sub: `${fmtShort(operatingOverheadMo)}/mo target`,
       ok: overheadOK,
     },
     {
       label: "Cash runway",
       value: `${runwayMonths.toFixed(1)} mo`,
-      sub: `On essentials only (${fmtShort(SURVIVAL_FLOOR_MO)}/mo)`,
+      sub: `On essentials only (${fmtShort(survivalFloorMo)}/mo)`,
       ok: runwayOK,
     },
   ];
@@ -723,7 +773,7 @@ const BudgetHealthCard = ({ ministries }) => {
 // DASHBOARD PAGE
 // ============================================================
 
-const DashboardPage = ({ ministries }) => {
+const DashboardPage = ({ ministries, operatingOverheadMo, survivalFloorMo }) => {
   const kpis = [
     { label: "Total Donations '25", value: fmt(TOTAL_DONATIONS), trend: "+12.4%", icon: HandHeart, tone: "forest" },
     { label: "Total Expenses '25", value: fmt(TOTAL_EXPENSES), trend: "88.05% of donations", icon: Receipt, tone: "copper" },
@@ -733,7 +783,7 @@ const DashboardPage = ({ ministries }) => {
 
   return (
     <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 24 }}>
-      <BudgetHealthCard ministries={ministries} />
+      <BudgetHealthCard ministries={ministries} operatingOverheadMo={operatingOverheadMo} survivalFloorMo={survivalFloorMo} />
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
         {kpis.map((k, i) => {
@@ -1146,14 +1196,14 @@ const ThresholdsPanel = ({ config, alerts, updateThreshold }) => {
   );
 };
 
-const AlertsLivePanel = ({ alerts, config, ministries }) => {
+const AlertsLivePanel = ({ alerts, config, ministries, operatingOverheadMo, survivalFloorMo }) => {
   const ctx = buildAlertContext({
     monthlyTrend: MONTHLY_TREND,
     ministries: ministries,
     receipts: RECENT_RECEIPTS,
     cashOnHand: BALANCE_END,
-    operatingOverheadMo: OPERATING_OVERHEAD_MO,
-    survivalFloorMo: SURVIVAL_FLOOR_MO,
+    operatingOverheadMo,
+    survivalFloorMo,
     now: new Date("2025-12-31T23:59:59"),
   });
   const results = evaluateAlerts(ctx, alerts, config);
@@ -1985,7 +2035,7 @@ const QuarterlyReviewBanner = ({ ministries, updateMinistryBudget, logActivity, 
 // WHAT-IF SCENARIO BUILDER — sliders that recompute totals live
 // ============================================================
 
-const WhatIfScenarioSection = ({ ministries, updateMinistryBudget, logActivity }) => {
+const WhatIfScenarioSection = ({ ministries, updateMinistryBudget, logActivity, operatingOverheadMo, survivalFloorMo }) => {
   const [drafts, setDrafts] = useState({});
   const [savedCount, setSavedCount] = useState(0);
 
@@ -1993,9 +2043,8 @@ const WhatIfScenarioSection = ({ ministries, updateMinistryBudget, logActivity }
   const setDraft = (id, v) => setDrafts((d) => ({ ...d, [id]: v }));
 
   const ministryTotal = ministries.reduce((s, m) => s + projected(m), 0);
-  const operatingTotal = OPERATING_OVERHEAD_YR + ministryTotal + EVENTS_BUDGET_YR + BLESSINGS_BUDGET_YR;
+  const operatingTotal = (operatingOverheadMo * 12) + ministryTotal + EVENTS_BUDGET_YR + BLESSINGS_BUDGET_YR;
   const surplus = DONATION_TARGET_YR - operatingTotal;
-  const survivalFloorMo = SURVIVAL_FLOOR_MO;
   const runwayMonths = BALANCE_END / survivalFloorMo;
 
   const hasChanges = Object.keys(drafts).length > 0 && ministries.some((m) => drafts[m.id] !== undefined && drafts[m.id] !== m.budget);
@@ -2173,7 +2222,7 @@ const WhatIfScenarioSection = ({ ministries, updateMinistryBudget, logActivity }
 // BUDGET PAGE
 // ============================================================
 
-const BudgetPage = ({ ministries, updateMinistryBudget, logActivity }) => {
+const BudgetPage = ({ ministries, updateMinistryBudget, logActivity, recurringPayments, operatingOverheadMo, survivalFloorMo }) => {
   const [alerts, setAlerts] = useState({
     donationsBelowOverhead: true,
     ministryOverBudget: true,
@@ -2189,9 +2238,12 @@ const BudgetPage = ({ ministries, updateMinistryBudget, logActivity }) => {
   };
 
   const sections = [
-    { key: "facilities", label: "Facilities", icon: Building2, items: MONTHLY_OVERHEAD.facilities },
-    { key: "people", label: "People", icon: Users, items: MONTHLY_OVERHEAD.people },
-    { key: "operations", label: "Operations", icon: Activity, items: MONTHLY_OVERHEAD.operations },
+    { key: "facilities", label: "Facilities", icon: Building2,
+      items: recurringPayments.filter((p) => p.category === "facilities").map((p) => ({ name: p.name, amount: p.amount, essential: true })) },
+    { key: "people", label: "People & Payroll", icon: Users,
+      items: recurringPayments.filter((p) => p.category === "people").map((p) => ({ name: p.name, amount: p.amount, essential: true })) },
+    { key: "operations", label: "Operations & Ministry", icon: Activity,
+      items: recurringPayments.filter((p) => p.category === "operations" || p.category === "ministry").map((p) => ({ name: p.name, amount: p.amount, essential: false })) },
   ];
 
   const fullBudget = [
@@ -2201,7 +2253,7 @@ const BudgetPage = ({ ministries, updateMinistryBudget, logActivity }) => {
     { name: "Blessings & care", amount: BLESSINGS_BUDGET_YR, color: COLORS.amber, desc: "Pastor's, ministers', guests'" },
   ];
 
-  const runway2026Worst = BALANCE_END / SURVIVAL_FLOOR_MO;
+  const runway2026Worst = BALANCE_END / survivalFloorMo;
 
   const recsRef = useRef(null);
   const scrollToRecs = () => recsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -2233,8 +2285,8 @@ const BudgetPage = ({ ministries, updateMinistryBudget, logActivity }) => {
         </Card>
         <Card style={{ padding: 22, backgroundColor: COLORS.cream, borderColor: COLORS.copperSoft }}>
           <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Min. Monthly Overhead</div>
-          <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 500, color: COLORS.ink, marginTop: 6, letterSpacing: -0.5 }}>{fmtShort(OPERATING_OVERHEAD_MO)}</div>
-          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>Survival floor: {fmtShort(SURVIVAL_FLOOR_MO)}</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 500, color: COLORS.ink, marginTop: 6, letterSpacing: -0.5 }}>{fmtShort(operatingOverheadMo)}</div>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>Survival floor: {fmtShort(survivalFloorMo)}</div>
         </Card>
       </div>
 
@@ -2250,7 +2302,7 @@ const BudgetPage = ({ ministries, updateMinistryBudget, logActivity }) => {
       <VarianceSection ministries={ministries} />
 
       {/* WHAT-IF SCENARIO BUILDER */}
-      <WhatIfScenarioSection ministries={ministries} updateMinistryBudget={updateMinistryBudget} logActivity={logActivity} />
+      <WhatIfScenarioSection ministries={ministries} updateMinistryBudget={updateMinistryBudget} logActivity={logActivity} operatingOverheadMo={operatingOverheadMo} survivalFloorMo={survivalFloorMo} />
 
       {/* MONTHLY OVERHEAD SETUP */}
       <Card style={{ padding: 28 }}>
@@ -2274,7 +2326,7 @@ const BudgetPage = ({ ministries, updateMinistryBudget, logActivity }) => {
         <div style={{ padding: 14, backgroundColor: COLORS.cream, borderRadius: 10, marginBottom: 20, display: "flex", alignItems: "flex-start", gap: 12 }}>
           <Sparkles size={18} color={COLORS.copper} style={{ flexShrink: 0, marginTop: 2 }} />
           <div style={{ fontSize: 12, color: COLORS.ink, lineHeight: 1.6 }}>
-            <strong>Smart suggestion.</strong> These figures are derived from your 2025 actuals: payroll & taxes ($430k), facilities ($403k), with the Safe Haven loan removed (paid off Dec 2025) and a 5% inflation buffer. Adjust any line below — every alert and dashboard color updates instantly.
+            <strong>Single source of truth.</strong> These line items are your recurring payments — edit them on the <strong>Calendar</strong> page and every total here updates instantly. Survival floor counts only Facilities + People & Payroll; Operations & Ministry are operational.
           </div>
         </div>
 
@@ -2313,7 +2365,7 @@ const BudgetPage = ({ ministries, updateMinistryBudget, logActivity }) => {
               <Flame size={14} color={COLORS.red} />
               <div style={{ fontSize: 11, color: COLORS.red, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Survival Floor</div>
             </div>
-            <div style={{ fontFamily: fontDisplay, fontSize: 30, fontWeight: 500, color: COLORS.ink, letterSpacing: -0.7 }}>{fmtShort(SURVIVAL_FLOOR_MO)}<span style={{ fontSize: 16, color: COLORS.inkSoft, fontWeight: 400 }}>/mo</span></div>
+            <div style={{ fontFamily: fontDisplay, fontSize: 30, fontWeight: 500, color: COLORS.ink, letterSpacing: -0.7 }}>{fmtShort(survivalFloorMo)}<span style={{ fontSize: 16, color: COLORS.inkSoft, fontWeight: 400 }}>/mo</span></div>
             <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 4 }}>If everything else stops — facilities + people only.</div>
           </div>
           <div style={{ padding: 18, borderRadius: 12, border: `1px solid ${COLORS.amber}30`, backgroundColor: "rgba(251,191,36,0.10)" }}>
@@ -2321,7 +2373,7 @@ const BudgetPage = ({ ministries, updateMinistryBudget, logActivity }) => {
               <Gauge size={14} color={COLORS.amber} />
               <div style={{ fontSize: 11, color: COLORS.amber, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Operating Overhead</div>
             </div>
-            <div style={{ fontFamily: fontDisplay, fontSize: 30, fontWeight: 500, color: COLORS.ink, letterSpacing: -0.7 }}>{fmtShort(OPERATING_OVERHEAD_MO)}<span style={{ fontSize: 16, color: COLORS.inkSoft, fontWeight: 400 }}>/mo</span></div>
+            <div style={{ fontFamily: fontDisplay, fontSize: 30, fontWeight: 500, color: COLORS.ink, letterSpacing: -0.7 }}>{fmtShort(operatingOverheadMo)}<span style={{ fontSize: 16, color: COLORS.inkSoft, fontWeight: 400 }}>/mo</span></div>
             <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 4 }}>Full overhead at planned operating scale.</div>
           </div>
         </div>
@@ -2396,7 +2448,7 @@ const BudgetPage = ({ ministries, updateMinistryBudget, logActivity }) => {
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {STRESS_SCENARIOS.map((s, i) => {
             const gap = s.projected - OPERATING_BUDGET_YR;
-            const survives = s.projected >= SURVIVAL_FLOOR_MO * 12;
+            const survives = s.projected >= survivalFloorMo * 12;
             const advice = gap >= 0
               ? "Full operating plan covered."
               : gap >= -(MINISTRIES_BUDGET_YR + EVENTS_BUDGET_YR)
@@ -2441,7 +2493,7 @@ const BudgetPage = ({ ministries, updateMinistryBudget, logActivity }) => {
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontFamily: fontDisplay, fontSize: 32, fontWeight: 500, color: COLORS.copper, letterSpacing: -0.7 }}>{runway2026Worst.toFixed(1)} months</div>
-            <div style={{ fontSize: 11, color: "rgba(250,250,250,0.6)" }}>{fmt(BALANCE_END)} reserves ÷ {fmtShort(SURVIVAL_FLOOR_MO)}/mo</div>
+            <div style={{ fontSize: 11, color: "rgba(250,250,250,0.6)" }}>{fmt(BALANCE_END)} reserves ÷ {fmtShort(survivalFloorMo)}/mo</div>
           </div>
         </div>
       </Card>
@@ -2495,9 +2547,449 @@ const BudgetPage = ({ ministries, updateMinistryBudget, logActivity }) => {
 
         <ThresholdsPanel config={alertConfig} alerts={alerts} updateThreshold={updateThreshold} />
 
-        <AlertsLivePanel alerts={alerts} config={alertConfig} ministries={ministries} />
+        <AlertsLivePanel alerts={alerts} config={alertConfig} ministries={ministries} operatingOverheadMo={operatingOverheadMo} survivalFloorMo={survivalFloorMo} />
       </Card>
 
+    </div>
+  );
+};
+
+// ============================================================
+// CALENDAR PAGE — recurring payments + scheduled events
+// ============================================================
+
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const PaymentEditorModal = ({ payment, onSave, onDelete, onClose }) => {
+  const isNew = !payment?.id;
+  const [name, setName] = useState(payment?.name || "");
+  const [amount, setAmount] = useState(payment?.amount?.toString() || "");
+  const [day, setDay] = useState(payment?.dayOfMonth?.toString() || "1");
+  const [category, setCategory] = useState(payment?.category || "operations");
+  const [note, setNote] = useState(payment?.note || "");
+
+  const canSubmit = name.trim().length > 0 && Number(amount) > 0 && Number(day) >= 1 && Number(day) <= 31;
+
+  const submit = () => {
+    if (!canSubmit) return;
+    onSave({
+      id: payment?.id || `p-${Date.now()}`,
+      name: name.trim(),
+      amount: Number(amount),
+      dayOfMonth: Math.min(31, Math.max(1, Number(day))),
+      category,
+      note: note.trim() || null,
+    });
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(10,10,10,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20 }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        backgroundColor: COLORS.surface, borderRadius: 16, width: 480, maxWidth: "100%", maxHeight: "90vh",
+        display: "flex", flexDirection: "column", boxShadow: "0 25px 80px rgba(0,0,0,0.6)",
+        border: `1px solid ${COLORS.border}`,
+      }}>
+        <div style={{ padding: "20px 24px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>{isNew ? "New" : "Edit"} recurring payment</div>
+            <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 600, color: COLORS.ink, marginTop: 2 }}>
+              {isNew ? "Add a payment" : payment.name}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}>
+            <X size={18} color={COLORS.inkSoft} />
+          </button>
+        </div>
+
+        <div style={{ padding: 24, overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <label style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Payment name *</label>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Quarterly Software Audit"
+              style={{ display: "block", width: "100%", padding: "10px 12px", marginTop: 4, fontSize: 14, fontWeight: 600, fontFamily: fontBody, color: COLORS.ink, backgroundColor: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box" }}
+            />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Amount * ($)</label>
+              <input
+                type="number" min="0"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="2500"
+                style={{ display: "block", width: "100%", padding: "10px 12px", marginTop: 4, fontSize: 14, fontWeight: 600, fontFamily: fontBody, color: COLORS.ink, backgroundColor: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box", fontVariantNumeric: "tabular-nums" }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Day of month *</label>
+              <input
+                type="number" min="1" max="31"
+                value={day}
+                onChange={(e) => setDay(e.target.value)}
+                style={{ display: "block", width: "100%", padding: "10px 12px", marginTop: 4, fontSize: 14, fontWeight: 600, fontFamily: fontBody, color: COLORS.ink, backgroundColor: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box", fontVariantNumeric: "tabular-nums" }}
+              />
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, marginBottom: 6, display: "block" }}>Category</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {Object.entries(CALENDAR_CATEGORIES).filter(([k]) => k !== "event").map(([key, cat]) => (
+                <button
+                  key={key}
+                  onClick={() => setCategory(key)}
+                  style={{
+                    padding: "7px 12px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: fontBody,
+                    backgroundColor: category === key ? cat.color + "25" : "transparent",
+                    color: category === key ? cat.color : COLORS.ink,
+                    border: `1px solid ${category === key ? cat.color : COLORS.border}`,
+                    display: "flex", alignItems: "center", gap: 6,
+                  }}
+                >
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: cat.color }} />
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Note (optional)</label>
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. PCO, Canva, Mailchimp"
+              style={{ display: "block", width: "100%", padding: "10px 12px", marginTop: 4, fontSize: 13, fontFamily: fontBody, color: COLORS.ink, backgroundColor: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box" }}
+            />
+          </div>
+          <div style={{ padding: 12, backgroundColor: COLORS.cream, borderRadius: 9, fontSize: 11, color: COLORS.inkSoft, display: "flex", alignItems: "flex-start", gap: 8, lineHeight: 1.5 }}>
+            <Repeat size={13} color={COLORS.copper} style={{ flexShrink: 0, marginTop: 1 }} />
+            <span>This payment will auto-roll forward every month on day {day || "—"}. Change it any time. Months with fewer days clamp to the last day.</span>
+          </div>
+        </div>
+
+        <div style={{ padding: "16px 24px", borderTop: `1px solid ${COLORS.border}`, backgroundColor: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          {!isNew ? (
+            <button onClick={onDelete} style={{ padding: "9px 14px", backgroundColor: "transparent", color: COLORS.red, border: `1px solid ${COLORS.red}40`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6 }}>
+              <Trash2 size={12} /> Delete
+            </button>
+          ) : <div />}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={onClose} style={{ padding: "10px 16px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody }}>
+              Cancel
+            </button>
+            <button onClick={submit} disabled={!canSubmit} style={{
+              padding: "10px 20px", border: "none", borderRadius: 8,
+              backgroundColor: canSubmit ? COLORS.forest : COLORS.cream,
+              color: canSubmit ? COLORS.bg : COLORS.inkSoft,
+              fontWeight: 700, fontSize: 13, cursor: canSubmit ? "pointer" : "not-allowed", fontFamily: fontBody,
+            }}>
+              {isNew ? "Add payment" : "Save changes"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CalendarPage = ({ recurringPayments, savePayment, deletePayment }) => {
+  const [year, setYear] = useState(2026);
+  const [month, setMonth] = useState(4); // May (0-indexed)
+  const [selectedDay, setSelectedDay] = useState(8);
+  const [editing, setEditing] = useState(null); // payment object | "new" | null
+  const recurring = recurringPayments;
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDow = new Date(year, month, 1).getDay();
+  const todayY = 2026, todayM = 4, todayD = 8; // demo today
+  const isToday = (d) => year === todayY && month === todayM && d === todayD;
+
+  // Items on a given day of the current month
+  const itemsForDay = (d) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const recurringItems = recurring
+      .filter((p) => Math.min(p.dayOfMonth, daysInMonth) === d)
+      .map((p) => ({ ...p, kind: "recurring" }));
+    const eventItems = SCHEDULED_EVENTS
+      .filter((e) => e.date === dateStr)
+      .map((e) => ({ ...e, category: "event", kind: "event" }));
+    return [...recurringItems, ...eventItems];
+  };
+
+  // Aggregate stats for visible month
+  const monthRecurringTotal = recurring.reduce((s, p) => s + p.amount, 0);
+  const monthEventTotal = SCHEDULED_EVENTS
+    .filter((e) => {
+      const [y, m] = e.date.split("-").map(Number);
+      return y === year && m - 1 === month;
+    })
+    .reduce((s, e) => s + e.amount, 0);
+  const monthTotal = monthRecurringTotal + monthEventTotal;
+  const dailyAvg = monthTotal / daysInMonth;
+
+  // Navigation
+  const goPrev = () => {
+    if (month === 0) { setYear((y) => y - 1); setMonth(11); }
+    else setMonth((m) => m - 1);
+  };
+  const goNext = () => {
+    if (month === 11) { setYear((y) => y + 1); setMonth(0); }
+    else setMonth((m) => m + 1);
+  };
+  const goToday = () => { setYear(todayY); setMonth(todayM); setSelectedDay(todayD); };
+
+  // Modal handlers — delegate to lifted state
+  const handleSave = (p) => { savePayment(p); setEditing(null); };
+  const handleDelete = () => { deletePayment(editing.id); setEditing(null); };
+
+  const selectedDayItems = itemsForDay(selectedDay);
+  const selectedDayTotal = selectedDayItems.reduce((s, i) => s + i.amount, 0);
+  const selectedDate = new Date(year, month, selectedDay);
+  const selectedDow = selectedDate.toLocaleDateString("en-US", { weekday: "long" });
+
+  // Build cells for the grid
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* TOP STATS */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+        <Card style={{ padding: 18 }}>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Total this month</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 26, fontWeight: 600, color: COLORS.ink, marginTop: 4 }}>{fmtShort(monthTotal)}</div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>recurring + events</div>
+        </Card>
+        <Card style={{ padding: 18 }}>
+          <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Recurring payments</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 26, fontWeight: 600, color: COLORS.ink, marginTop: 4 }}>{fmtShort(monthRecurringTotal)}</div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>{recurring.length} scheduled · auto-roll</div>
+        </Card>
+        <Card style={{ padding: 18 }}>
+          <div style={{ fontSize: 11, color: COLORS.amber, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Event spending</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 26, fontWeight: 600, color: COLORS.ink, marginTop: 4 }}>{fmtShort(monthEventTotal)}</div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>one-time this month</div>
+        </Card>
+        <Card style={{ padding: 18 }}>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Daily average</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 26, fontWeight: 600, color: COLORS.ink, marginTop: 4 }}>{fmtShort(dailyAvg)}</div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>over {daysInMonth} days</div>
+        </Card>
+      </div>
+
+      {/* CALENDAR + SIDE PANEL */}
+      <div style={{ display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: 20, alignItems: "flex-start" }}>
+
+        {/* CALENDAR GRID */}
+        <Card style={{ padding: 22 }}>
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button onClick={goPrev} style={{ width: 32, height: 32, border: `1px solid ${COLORS.border}`, borderRadius: 8, backgroundColor: "transparent", color: COLORS.ink, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <ChevronLeft size={15} />
+              </button>
+              <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 600, color: COLORS.ink, letterSpacing: -0.4, minWidth: 220 }}>
+                {MONTH_NAMES[month]} {year}
+              </div>
+              <button onClick={goNext} style={{ width: 32, height: 32, border: `1px solid ${COLORS.border}`, borderRadius: 8, backgroundColor: "transparent", color: COLORS.ink, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <ChevronRight size={15} />
+              </button>
+            </div>
+            <button onClick={goToday} style={{ padding: "8px 14px", backgroundColor: COLORS.cream, color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>
+              Today
+            </button>
+          </div>
+
+          {/* Legend */}
+          <div style={{ display: "flex", gap: 14, marginBottom: 14, flexWrap: "wrap" }}>
+            {Object.values(CALENDAR_CATEGORIES).map((cat) => (
+              <span key={cat.label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: COLORS.inkSoft, fontWeight: 600 }}>
+                <span style={{ width: 9, height: 9, borderRadius: 2, backgroundColor: cat.color }} />
+                {cat.label}
+              </span>
+            ))}
+          </div>
+
+          {/* Day-of-week headers */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
+            {DOW_LABELS.map((d) => (
+              <div key={d} style={{ fontSize: 10, color: COLORS.inkSoft, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center", padding: "6px 0" }}>{d}</div>
+            ))}
+          </div>
+
+          {/* Day cells */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+            {cells.map((d, i) => {
+              if (d === null) return <div key={i} />;
+              const items = itemsForDay(d);
+              const dayTotal = items.reduce((s, x) => s + x.amount, 0);
+              const today = isToday(d);
+              const sel = d === selectedDay;
+              return (
+                <button
+                  key={i}
+                  onClick={() => setSelectedDay(d)}
+                  style={{
+                    minHeight: 92, padding: 6, borderRadius: 8, fontFamily: fontBody, cursor: "pointer",
+                    background: sel ? "rgba(212,255,0,0.08)" : COLORS.bg,
+                    border: `1px solid ${sel ? COLORS.forest + "80" : COLORS.borderSoft}`,
+                    display: "flex", flexDirection: "column", alignItems: "stretch", textAlign: "left",
+                    transition: "all 0.12s",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                    <span style={{
+                      fontFamily: fontDisplay, fontSize: 14, fontWeight: 700,
+                      color: today ? COLORS.copper : sel ? COLORS.forest : COLORS.ink,
+                      width: 22, height: 22, borderRadius: 99,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      backgroundColor: today ? COLORS.copper + "20" : "transparent",
+                    }}>{d}</span>
+                    {dayTotal > 0 && (
+                      <span style={{ fontSize: 9, color: COLORS.inkSoft, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                        {fmtShort(dayTotal)}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    {items.slice(0, 3).map((it, j) => {
+                      const cat = CALENDAR_CATEGORIES[it.category];
+                      return (
+                        <span key={j} title={`${it.name} · ${fmt(it.amount)}`}
+                          style={{
+                            fontSize: 10, fontWeight: 600, color: cat.color,
+                            backgroundColor: cat.color + "15",
+                            borderLeft: `2px solid ${cat.color}`,
+                            padding: "2px 5px", borderRadius: 3,
+                            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                          }}>
+                          {it.name}
+                        </span>
+                      );
+                    })}
+                    {items.length > 3 && (
+                      <span style={{ fontSize: 9, color: COLORS.inkSoft, fontWeight: 600, padding: "1px 4px" }}>
+                        +{items.length - 3} more
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </Card>
+
+        {/* SIDE PANEL */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+          {/* Selected day */}
+          <Card style={{ padding: 22 }}>
+            <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>{selectedDow}</div>
+            <div style={{ fontFamily: fontDisplay, fontSize: 24, fontWeight: 600, color: COLORS.ink, letterSpacing: -0.5, marginTop: 2 }}>
+              {MONTH_NAMES[month]} {selectedDay}, {year}
+            </div>
+            {isToday(selectedDay) && (
+              <div style={{ marginTop: 4 }}>
+                <Pill tone="copper">Today</Pill>
+              </div>
+            )}
+
+            {selectedDayItems.length === 0 ? (
+              <div style={{ marginTop: 18, padding: 18, border: `1px dashed ${COLORS.border}`, borderRadius: 9, textAlign: "center" }}>
+                <div style={{ fontFamily: fontSerif, fontSize: 16, fontStyle: "italic", color: COLORS.inkSoft }}>
+                  No payments or events on this day.
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
+                  {selectedDayItems.map((it, i) => {
+                    const cat = CALENDAR_CATEGORIES[it.category];
+                    const Icon = it.kind === "recurring" ? Repeat : Sparkles;
+                    return (
+                      <div key={i} style={{
+                        padding: "10px 12px", borderRadius: 8,
+                        backgroundColor: COLORS.bg, borderLeft: `3px solid ${cat.color}`,
+                        display: "flex", alignItems: "center", gap: 10,
+                      }}>
+                        <Icon size={13} color={cat.color} style={{ flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{it.name}</div>
+                          {it.note && <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>{it.note}</div>}
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
+                          {fmt(it.amount)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <span style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Day total</span>
+                  <span style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 600, color: COLORS.forest }}>{fmt(selectedDayTotal)}</span>
+                </div>
+              </>
+            )}
+          </Card>
+
+          {/* Scheduled payments list */}
+          <Card style={{ padding: 22 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div>
+                <div style={{ fontFamily: fontDisplay, fontSize: 16, fontWeight: 600, color: COLORS.ink }}>Scheduled payments</div>
+                <div style={{ fontSize: 11, color: COLORS.inkSoft }}>Click any to edit · auto-rolls every month</div>
+              </div>
+              <button onClick={() => setEditing("new")} style={{
+                width: 32, height: 32, borderRadius: 8, backgroundColor: COLORS.forest, color: COLORS.bg,
+                border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <Plus size={15} strokeWidth={2.5} />
+              </button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {[...recurring].sort((a, b) => a.dayOfMonth - b.dayOfMonth).map((p) => {
+                const cat = CALENDAR_CATEGORIES[p.category];
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => setEditing(p)}
+                    style={{
+                      width: "100%", padding: "8px 10px", borderRadius: 7, fontFamily: fontBody, cursor: "pointer",
+                      backgroundColor: "transparent", border: `1px solid ${COLORS.borderSoft}`, textAlign: "left",
+                      display: "grid", gridTemplateColumns: "30px 1fr auto", gap: 8, alignItems: "center",
+                    }}
+                  >
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, fontVariantNumeric: "tabular-nums", textAlign: "center",
+                      padding: "3px 0", borderRadius: 4, backgroundColor: cat.color + "20", color: cat.color,
+                    }}>{p.dayOfMonth}</span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
+                      <div style={{ fontSize: 10, color: COLORS.inkSoft }}>{cat.label}</div>
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.ink, fontVariantNumeric: "tabular-nums" }}>{fmtShort(p.amount)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {editing && (
+        <PaymentEditorModal
+          payment={editing === "new" ? null : editing}
+          onSave={handleSave}
+          onDelete={handleDelete}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
   );
 };
@@ -3677,9 +4169,16 @@ const PeoplePage = () => {
 // INTEGRATIONS PAGE
 // ============================================================
 
+// Campuses available for donation routing.
+const INTEGRATION_CAMPUSES = [
+  { id: "main", name: "Main", subtitle: "Everett, WA", isHQ: true,  short: "E", color: "#D4FF00" },
+  { id: "tacoma", name: "Tacoma", subtitle: "Tacoma, WA", isHQ: false, short: "T", color: "#FF3B8A" },
+  { id: "ny", name: "New York", subtitle: "New York, NY", isHQ: false, short: "N", color: "#A78BFA" },
+];
+
 const INTEGRATIONS = [
   {
-    name: "Stripe", logo: "S", color: "#635BFF",
+    name: "Stripe", logo: "S", color: "#635BFF", donations: true,
     desc: "Online giving via website & mobile. Auto-imports donations every 15 min.",
     fields: [
       { key: "secretKey", label: "Secret API key", placeholder: "sk_live_…", type: "password", required: true, help: "Dashboard → Developers → API keys" },
@@ -3688,7 +4187,7 @@ const INTEGRATIONS = [
     perms: ["Read all charges", "Read customer info", "Webhook on charge.succeeded"],
   },
   {
-    name: "Square", logo: "■", color: "#000000",
+    name: "Square", logo: "■", color: "#000000", donations: true,
     desc: "In-person giving via Square readers. Sun & Fri service offerings.",
     fields: [
       { key: "accessToken", label: "Access token", placeholder: "EAAAEx…", type: "password", required: true, help: "Developer Dashboard → Credentials → Access tokens" },
@@ -3697,8 +4196,18 @@ const INTEGRATIONS = [
     perms: ["Read payments", "Read locations", "Read items (offerings)"],
   },
   {
-    name: "QuickBooks Online", logo: "Q", color: "#2CA01C",
-    desc: "Two-way accounting sync. Donations → income, receipts → expenses, classes per ministry.",
+    name: "ACH Direct", logo: "$", color: "#4ADE80", donations: true,
+    desc: "Direct bank transfers for tithes and large gifts. Lower fees than card.",
+    fields: [
+      { key: "bankRouting", label: "Bank routing number", placeholder: "123456789", type: "text", required: true },
+      { key: "merchantId", label: "Merchant ID", placeholder: "MERCH_…", type: "text", required: true },
+      { key: "apiToken", label: "API token", placeholder: "•••", type: "password", required: true },
+    ],
+    perms: ["Initiate ACH credits", "Read transaction status", "Webhook on settle"],
+  },
+  {
+    name: "QuickBooks Online", logo: "Q", color: "#2CA01C", donations: false,
+    desc: "Two-way accounting sync. Donations → income, receipts → expenses, classes per ministry. Org-wide only.",
     fields: [
       { key: "companyId", label: "Company / Realm ID", placeholder: "1234567890", type: "text", required: true, help: "Settings → Account & Settings → Billing → Company ID" },
       { key: "clientId", label: "OAuth Client ID", placeholder: "ABxxx…", type: "text", required: true },
@@ -3707,8 +4216,8 @@ const INTEGRATIONS = [
     perms: ["Read & write accounts", "Manage classes (ministries)", "Manage customers (donors)"],
   },
   {
-    name: "Google Workspace", logo: "G", color: "#4285F4",
-    desc: "Single sign-on for ministry leaders. Calendar sync for events & camps.",
+    name: "Google Workspace", logo: "G", color: "#4285F4", donations: false,
+    desc: "Single sign-on for ministry leaders. Calendar sync for events & camps. Org-wide only.",
     fields: [
       { key: "domain", label: "Workspace domain", placeholder: "ircchurch.org", type: "text", required: true },
       { key: "serviceAccount", label: "Service account email", placeholder: "irc-steward@…iam.gserviceaccount.com", type: "text", required: true, help: "Google Cloud Console → IAM & Admin → Service accounts" },
@@ -3716,7 +4225,7 @@ const INTEGRATIONS = [
     perms: ["Read user directory", "Read calendar events"],
   },
   {
-    name: "Mailchimp", logo: "M", color: "#FFE01B",
+    name: "Mailchimp", logo: "M", color: "#FFE01B", donations: false,
     desc: "Auto-segment donors for thank-you emails, year-end giving statements.",
     fields: [
       { key: "apiKey", label: "API key", placeholder: "abc123…-us21", type: "password", required: true, help: "Account → Extras → API keys. Datacenter is the suffix after the dash." },
@@ -3725,33 +4234,56 @@ const INTEGRATIONS = [
     perms: ["Read & manage subscribers", "Send campaigns"],
   },
   {
-    name: "Planning Center", logo: "P", color: "#4099FF",
-    desc: "Sync member directory, attendance, and check-in for kids ministry.",
+    name: "Planning Center", logo: "P", color: "#4099FF", donations: true,
+    desc: "Member directory, attendance, kids check-in, and Giving module donations.",
     fields: [
       { key: "appId", label: "Application ID", placeholder: "…", type: "text", required: true, help: "api.planningcenteronline.com → Personal Access Tokens" },
       { key: "secret", label: "Secret", placeholder: "•••", type: "password", required: true },
     ],
-    perms: ["Read people", "Read check-ins"],
+    perms: ["Read people", "Read check-ins", "Read giving"],
   },
 ];
 
-const ConnectionModal = ({ integration, existing, onConnect, onClose }) => {
+// Pre-populate to match IRC's actual setup: Stripe org-wide, Square Main only, QuickBooks org-wide.
+const INITIAL_CONNECTIONS = [
+  { id: "conn-stripe-all",  integrationName: "Stripe", scope: "all", credentials: { secretKey: "sk_live_•••" }, connectedAt: Date.now() - 90 * 24 * 60 * 60 * 1000, lastSync: Date.now() - 2 * 60 * 1000 },
+  { id: "conn-square-main", integrationName: "Square", scope: "main", credentials: { accessToken: "EAAAEx•••", locationId: "L8X09F•••" }, connectedAt: Date.now() - 60 * 24 * 60 * 60 * 1000, lastSync: Date.now() - 8 * 60 * 1000 },
+  { id: "conn-qb-all",      integrationName: "QuickBooks Online", scope: "all", credentials: { companyId: "1234567890", clientId: "AB•••", clientSecret: "•••" }, connectedAt: Date.now() - 90 * 24 * 60 * 60 * 1000, lastSync: Date.now() - 60 * 60 * 1000 },
+];
+
+const ConnectionModal = ({ integration, existing, defaultScope, onConnect, onClose }) => {
   const [values, setValues] = useState(existing || {});
   const [reveal, setReveal] = useState({});
+  const [scopeMode, setScopeMode] = useState(defaultScope || "all"); // 'all' | 'campus'
+  const [scopeCampus, setScopeCampus] = useState(null); // campus id when scopeMode='campus'
+
+  const supportsCampusScope = integration.donations;
 
   const requiredOk = integration.fields
     .filter((f) => f.required)
     .every((f) => (values[f.key] ?? "").trim().length > 0);
+  const scopeOk = !supportsCampusScope || scopeMode === "all" || scopeCampus != null;
+  const canSubmit = requiredOk && scopeOk;
 
   const submit = () => {
-    if (!requiredOk) return;
-    onConnect(integration, values);
+    if (!canSubmit) return;
+    const scope = supportsCampusScope ? (scopeMode === "all" ? "all" : scopeCampus) : "all";
+    onConnect(integration, values, scope);
   };
+
+  const submitLabel = (() => {
+    if (existing) return "Update credentials";
+    if (!supportsCampusScope) return "Connect";
+    if (scopeMode === "all") return "Connect for all campuses";
+    if (!scopeCampus) return "Choose a campus";
+    const c = INTEGRATION_CAMPUSES.find((c) => c.id === scopeCampus);
+    return `Connect for ${c?.name || ""}`;
+  })();
 
   return (
     <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(10,10,10,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20 }} onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} style={{
-        backgroundColor: COLORS.surface, borderRadius: 16, width: 540, maxWidth: "100%", maxHeight: "90vh",
+        backgroundColor: COLORS.surface, borderRadius: 16, width: 600, maxWidth: "100%", maxHeight: "90vh",
         display: "flex", flexDirection: "column", boxShadow: "0 25px 80px rgba(0,0,0,0.6)",
         border: `1px solid ${COLORS.border}`,
       }}>
@@ -3776,6 +4308,85 @@ const ConnectionModal = ({ integration, existing, onConnect, onClose }) => {
         </div>
 
         <div style={{ padding: 24, overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 14 }}>
+
+          {!existing && (
+            supportsCampusScope ? (
+              <>
+                <div>
+                  <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, marginBottom: 4 }}>Campus routing</div>
+                  <div style={{ fontFamily: fontSerif, fontSize: 17, color: COLORS.ink, fontStyle: "italic", marginBottom: 12 }}>
+                    Choose how this integration serves your campuses.
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <button
+                      onClick={() => setScopeMode("all")}
+                      style={{
+                        padding: 14, borderRadius: 10, fontFamily: fontBody, cursor: "pointer", textAlign: "left",
+                        backgroundColor: scopeMode === "all" ? "rgba(212,255,0,0.08)" : COLORS.bg,
+                        border: `2px solid ${scopeMode === "all" ? COLORS.forest : COLORS.border}`,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                        <Globe size={16} color={scopeMode === "all" ? COLORS.forest : COLORS.inkSoft} />
+                        <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink }}>All campuses</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: COLORS.inkSoft, lineHeight: 1.45 }}>One account, one feed. Donations tagged by campus internally.</div>
+                    </button>
+                    <button
+                      onClick={() => setScopeMode("campus")}
+                      style={{
+                        padding: 14, borderRadius: 10, fontFamily: fontBody, cursor: "pointer", textAlign: "left",
+                        backgroundColor: scopeMode === "campus" ? "rgba(255,90,31,0.06)" : COLORS.bg,
+                        border: `2px solid ${scopeMode === "campus" ? COLORS.copper : COLORS.border}`,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                        <MapPin size={16} color={scopeMode === "campus" ? COLORS.copper : COLORS.inkSoft} />
+                        <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink }}>Specific campus</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: COLORS.inkSoft, lineHeight: 1.45 }}>Lock this account to one campus. Add another later for siblings.</div>
+                    </button>
+                  </div>
+                </div>
+
+                {scopeMode === "campus" && (
+                  <div>
+                    <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, marginBottom: 8 }}>Pick a campus</div>
+                    <div style={{ display: "grid", gridTemplateColumns: `repeat(${INTEGRATION_CAMPUSES.length}, 1fr)`, gap: 8 }}>
+                      {INTEGRATION_CAMPUSES.map((c) => {
+                        const sel = scopeCampus === c.id;
+                        return (
+                          <button
+                            key={c.id}
+                            onClick={() => setScopeCampus(c.id)}
+                            style={{
+                              padding: 12, borderRadius: 8, cursor: "pointer", fontFamily: fontBody, textAlign: "center",
+                              backgroundColor: sel ? c.color + "20" : COLORS.bg,
+                              border: `2px solid ${sel ? c.color : COLORS.border}`,
+                            }}
+                          >
+                            <div style={{ width: 32, height: 32, borderRadius: 8, margin: "0 auto 6px", backgroundColor: c.color, color: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fontDisplay, fontWeight: 700, fontSize: 14 }}>
+                              {c.short}
+                            </div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.ink }}>{c.name}</div>
+                            <div style={{ fontSize: 10, color: COLORS.inkSoft, marginTop: 2 }}>{c.subtitle}</div>
+                            {c.isHQ && <div style={{ fontSize: 9, color: COLORS.copper, fontWeight: 700, marginTop: 4, letterSpacing: 0.4 }}>MAIN</div>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{ padding: 14, borderRadius: 9, backgroundColor: COLORS.cream, border: `1px solid ${COLORS.borderSoft}`, display: "flex", alignItems: "center", gap: 10 }}>
+                <Globe size={16} color={COLORS.copper} />
+                <div style={{ fontSize: 12, color: COLORS.ink, lineHeight: 1.5 }}>
+                  <strong>Serves all campuses.</strong> {integration.name} is a back-office tool — no per-campus split needed.
+                </div>
+              </div>
+            )
+          )}
 
           <div style={{ padding: 12, backgroundColor: COLORS.cream, borderRadius: 9, fontSize: 11, color: COLORS.inkSoft, display: "flex", alignItems: "flex-start", gap: 8, lineHeight: 1.5 }}>
             <Lock size={13} color={COLORS.green} style={{ flexShrink: 0, marginTop: 1 }} />
@@ -3837,24 +4448,31 @@ const ConnectionModal = ({ integration, existing, onConnect, onClose }) => {
           )}
         </div>
 
-        <div style={{ padding: "18px 24px", borderTop: `1px solid ${COLORS.border}`, backgroundColor: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10 }}>
-          <button onClick={onClose} style={{ padding: "10px 18px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody }}>
-            Cancel
-          </button>
-          <button
-            onClick={submit}
-            disabled={!requiredOk}
-            style={{
-              padding: "10px 22px", border: "none", borderRadius: 9,
-              fontWeight: 700, fontSize: 13, fontFamily: fontBody,
-              cursor: requiredOk ? "pointer" : "not-allowed",
-              backgroundColor: requiredOk ? COLORS.forest : COLORS.cream,
-              color: requiredOk ? COLORS.bg : COLORS.inkSoft,
-              display: "flex", alignItems: "center", gap: 6,
-            }}
-          >
-            <Link2 size={13} /> {existing ? "Update credentials" : "Connect"}
-          </button>
+        <div style={{ padding: "16px 24px", borderTop: `1px solid ${COLORS.border}`, backgroundColor: COLORS.bg }}>
+          {!existing && supportsCampusScope && (
+            <div style={{ fontSize: 11, color: COLORS.inkSoft, fontStyle: "italic", marginBottom: 12, textAlign: "center" }}>
+              You can change this later. Add another account for a different campus, or merge them back into one — anytime.
+            </div>
+          )}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10 }}>
+            <button onClick={onClose} style={{ padding: "10px 18px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody }}>
+              Cancel
+            </button>
+            <button
+              onClick={submit}
+              disabled={!canSubmit}
+              style={{
+                padding: "10px 22px", border: "none", borderRadius: 9,
+                fontWeight: 700, fontSize: 13, fontFamily: fontBody,
+                cursor: canSubmit ? "pointer" : "not-allowed",
+                backgroundColor: canSubmit ? COLORS.forest : COLORS.cream,
+                color: canSubmit ? COLORS.bg : COLORS.inkSoft,
+                display: "flex", alignItems: "center", gap: 6,
+              }}
+            >
+              <Link2 size={13} /> {submitLabel}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -3862,72 +4480,135 @@ const ConnectionModal = ({ integration, existing, onConnect, onClose }) => {
 };
 
 const IntegrationsPage = () => {
-  // connections: { [integrationName]: { credentials, connectedAt, lastSync } }
-  const [connections, setConnections] = useState({});
+  // Connections is an array — multiple instances per integration allowed
+  // for donation providers (one per campus). Non-donation integrations
+  // get one entry with scope='all'.
+  const [connections, setConnections] = useState(INITIAL_CONNECTIONS);
+  // editing: { integration, connection?, mode: 'new' | 'add-campus' | 'edit' }
   const [editing, setEditing] = useState(null);
 
-  const connect = (integration, credentials) => {
-    setConnections((c) => ({
-      ...c,
-      [integration.name]: {
-        credentials,
-        connectedAt: new Date(),
-        lastSync: new Date(),
-      },
-    }));
-    setEditing(null);
-  };
-
-  const disconnect = (integration) => {
-    if (!confirm(`Disconnect ${integration.name}? Stored credentials will be cleared.`)) return;
-    setConnections((c) => {
-      const next = { ...c };
-      delete next[integration.name];
-      return next;
-    });
-  };
-
-  const sync = (integration) => {
-    setConnections((c) => ({
-      ...c,
-      [integration.name]: { ...c[integration.name], lastSync: new Date() },
-    }));
-  };
-
-  const totalConnected = Object.keys(connections).length;
-  const formatRelative = (d) => {
-    const sec = Math.floor((Date.now() - d.getTime()) / 1000);
+  const formatRelative = (timestamp) => {
+    const sec = Math.floor((Date.now() - timestamp) / 1000);
     if (sec < 60) return `${sec}s ago`;
     if (sec < 3600) return `${Math.floor(sec / 60)} min ago`;
     if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
     return `${Math.floor(sec / 86400)}d ago`;
   };
 
+  const connect = (integration, credentials, scope) => {
+    if (editing?.connection) {
+      // Update existing
+      const id = editing.connection.id;
+      setConnections((cs) => cs.map((c) => c.id === id ? { ...c, credentials } : c));
+    } else {
+      // Add new
+      setConnections((cs) => [...cs, {
+        id: `conn-${integration.name.toLowerCase().replace(/\s+/g, "-")}-${scope}-${Date.now()}`,
+        integrationName: integration.name,
+        scope,
+        credentials,
+        connectedAt: Date.now(),
+        lastSync: Date.now(),
+      }]);
+    }
+    setEditing(null);
+  };
+
+  const disconnect = (connection) => {
+    if (!confirm(`Disconnect this ${connection.integrationName} integration? Stored credentials will be cleared.`)) return;
+    setConnections((cs) => cs.filter((c) => c.id !== connection.id));
+  };
+
+  const sync = (connection) => {
+    setConnections((cs) => cs.map((c) => c.id === connection.id ? { ...c, lastSync: Date.now() } : c));
+  };
+
+  // Group connections per integration
+  const connectionsFor = (integrationName) => connections.filter((c) => c.integrationName === integrationName);
+  // Donation providers serving a given campus (either scope='all' or scope=campusId)
+  const donationConnsForCampus = (campusId) => connections.filter((c) => {
+    const int = INTEGRATIONS.find((i) => i.name === c.integrationName);
+    return int?.donations && (c.scope === "all" || c.scope === campusId);
+  });
+
+  const totalConnected = connections.length;
+
   return (
     <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 20 }}>
 
+      {/* HERO */}
       <Card style={{ padding: 24, backgroundColor: COLORS.cream, borderColor: COLORS.copper + "40" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: COLORS.copper, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+          <div style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: COLORS.copper, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <Sparkles size={22} />
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: fontSerif, fontSize: 22, fontWeight: 400, color: COLORS.ink, fontStyle: "italic" }}>
-              {totalConnected === 0
-                ? "Nothing connected yet — pick one to start."
-                : `${totalConnected} of ${INTEGRATIONS.length} connected.`}
+              One integration for everyone, or one per campus — your call.
             </div>
-            <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 4 }}>
-              Click Connect on any tile, paste your credentials, and we'll start syncing.
+            <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 6, lineHeight: 1.55, maxWidth: 720 }}>
+              Donation providers (Stripe, Square, ACH) can route to a single campus or be shared across all. Accounting tools stay org-wide. Connect more than one of the same provider to split donations cleanly between campuses.
             </div>
           </div>
         </div>
       </Card>
 
+      {/* DONATION ROUTING MAP */}
+      <Card style={{ padding: 22 }}>
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Globe size={14} color={COLORS.copper} />
+            <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Donation routing · per campus</div>
+          </div>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 4 }}>Where each campus's giving lands. Shared providers route to all four.</div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${INTEGRATION_CAMPUSES.length}, 1fr)`, gap: 12 }}>
+          {INTEGRATION_CAMPUSES.map((c) => {
+            const conns = donationConnsForCampus(c.id);
+            return (
+              <div key={c.id} style={{ padding: 16, borderRadius: 10, border: `1px solid ${COLORS.border}`, borderLeft: `4px solid ${c.color}`, backgroundColor: COLORS.bg }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: c.color, color: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fontDisplay, fontWeight: 700, fontSize: 14 }}>
+                    {c.short}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>{c.name}</span>
+                      {c.isHQ && <span style={{ fontSize: 9, color: COLORS.copper, fontWeight: 700, padding: "1px 6px", borderRadius: 4, backgroundColor: COLORS.copper + "20", letterSpacing: 0.4 }}>HQ</span>}
+                    </div>
+                    <div style={{ fontSize: 11, color: COLORS.inkSoft }}>{c.subtitle}</div>
+                  </div>
+                </div>
+                {conns.length === 0 ? (
+                  <div style={{ fontSize: 11, color: COLORS.inkSoft, fontStyle: "italic" }}>
+                    No donation providers · inheriting from {INTEGRATION_CAMPUSES.find((cc) => cc.isHQ)?.name}
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {conns.map((conn) => {
+                      const int = INTEGRATIONS.find((i) => i.name === conn.integrationName);
+                      const shared = conn.scope === "all";
+                      return (
+                        <div key={conn.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: COLORS.ink }}>
+                          {shared ? <Globe size={10} color={COLORS.forest} /> : <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: c.color }} />}
+                          <span style={{ fontWeight: 600 }}>{int?.name || conn.integrationName}</span>
+                          <span style={{ color: COLORS.inkSoft }}>· {shared ? "shared" : "direct"}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* INTEGRATION CARDS */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
         {INTEGRATIONS.map((int) => {
-          const conn = connections[int.name];
-          const isConnected = !!conn;
+          const conns = connectionsFor(int.name);
+          const isConnected = conns.length > 0;
 
           return (
             <Card key={int.name} style={{ padding: 24 }}>
@@ -3938,12 +4619,15 @@ const IntegrationsPage = () => {
                   display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 22, flexShrink: 0,
                 }}>{int.logo}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
                     <div style={{ fontFamily: fontDisplay, fontSize: 19, fontWeight: 600, color: COLORS.ink }}>{int.name}</div>
+                    {int.donations && (
+                      <span style={{ padding: "2px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700, color: COLORS.copper, backgroundColor: COLORS.copper + "18", textTransform: "uppercase", letterSpacing: 0.4 }}>Donations</span>
+                    )}
                     {isConnected ? (
                       <Pill tone="success">
                         <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: COLORS.green, marginRight: 4, boxShadow: `0 0 0 3px ${COLORS.green}30` }} />
-                        Connected
+                        {conns.length} connected
                       </Pill>
                     ) : (
                       <Pill tone="neutral">Not connected</Pill>
@@ -3953,32 +4637,45 @@ const IntegrationsPage = () => {
                 </div>
               </div>
 
-              {isConnected ? (
-                <div style={{ padding: 14, backgroundColor: COLORS.bg, borderRadius: 10, marginBottom: 12 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 12 }}>
-                    <div>
-                      <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Last sync</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink, marginTop: 2 }}>{formatRelative(conn.lastSync)}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Connected</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink, marginTop: 2 }}>{formatRelative(conn.connectedAt)}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Status</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.green, marginTop: 2 }}>● Live</div>
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 11, color: COLORS.inkSoft, lineHeight: 1.7 }}>
-                    <div style={{ fontWeight: 700, marginBottom: 4, color: COLORS.ink, textTransform: "uppercase", letterSpacing: 0.4 }}>Permissions granted</div>
-                    {int.perms.map((p, j) => (
-                      <div key={j} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <Lock size={10} color={COLORS.green} /> {p}
+              {isConnected && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+                  {conns.map((conn) => {
+                    const isAll = conn.scope === "all";
+                    const campus = isAll ? null : INTEGRATION_CAMPUSES.find((c) => c.id === conn.scope);
+                    const chipColor = isAll ? COLORS.forest : (campus?.color || COLORS.inkSoft);
+                    return (
+                      <div key={conn.id} style={{ padding: 12, borderRadius: 9, backgroundColor: COLORS.bg, border: `1px solid ${COLORS.borderSoft}` }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+                          <span style={{
+                            display: "inline-flex", alignItems: "center", gap: 6,
+                            padding: "3px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700,
+                            backgroundColor: chipColor + "20", color: chipColor, textTransform: "uppercase", letterSpacing: 0.4,
+                          }}>
+                            {isAll ? <Globe size={11} /> : <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: chipColor }} />}
+                            {isAll ? "All campuses" : `${campus?.name || conn.scope} only`}
+                          </span>
+                          <div style={{ fontSize: 11, color: COLORS.inkSoft }}>
+                            Last sync <strong style={{ color: COLORS.green }}>{formatRelative(conn.lastSync)}</strong>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <button onClick={() => sync(conn)} style={{ flex: 1, minWidth: 100, padding: "7px 12px", backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 7, fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                            <RefreshCw size={11} /> Sync now
+                          </button>
+                          <button onClick={() => setEditing({ integration: int, connection: conn, mode: "edit" })} style={{ padding: "7px 12px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 7, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: fontBody }}>
+                            Update
+                          </button>
+                          <button onClick={() => disconnect(conn)} style={{ padding: "7px 12px", backgroundColor: "transparent", color: COLORS.red, border: `1px solid ${COLORS.red}40`, borderRadius: 7, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: fontBody }}>
+                            Remove
+                          </button>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
-              ) : (
+              )}
+
+              {!isConnected && (
                 <div style={{ padding: 14, backgroundColor: COLORS.bg, borderRadius: 10, marginBottom: 12, fontSize: 11, color: COLORS.inkSoft, lineHeight: 1.7 }}>
                   <div style={{ fontWeight: 700, marginBottom: 4, color: COLORS.ink, textTransform: "uppercase", letterSpacing: 0.4 }}>You'll need</div>
                   {int.fields.map((f, i) => (
@@ -3990,23 +4687,20 @@ const IntegrationsPage = () => {
               )}
 
               <div style={{ display: "flex", gap: 8 }}>
-                {isConnected ? (
-                  <>
-                    <button onClick={() => sync(int)} style={{ flex: 1, padding: "9px 14px", backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                      <RefreshCw size={12} /> Sync now
-                    </button>
-                    <button onClick={() => setEditing(int)} style={{ padding: "9px 14px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>
-                      Update
-                    </button>
-                    <button onClick={() => disconnect(int)} style={{ padding: "9px 14px", backgroundColor: "transparent", color: COLORS.red, border: `1px solid ${COLORS.red}40`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>
-                      Disconnect
-                    </button>
-                  </>
-                ) : (
-                  <button onClick={() => setEditing(int)} style={{ flex: 1, padding: "10px 14px", backgroundColor: COLORS.copper, color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                {!isConnected ? (
+                  <button onClick={() => setEditing({ integration: int, mode: "new" })} style={{ flex: 1, padding: "10px 14px", backgroundColor: COLORS.copper, color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                     <Link2 size={13} /> Connect {int.name}
                   </button>
-                )}
+                ) : int.donations ? (
+                  <button onClick={() => setEditing({ integration: int, mode: "add-campus" })} style={{
+                    flex: 1, padding: "10px 14px", backgroundColor: "transparent",
+                    color: COLORS.copper, border: `1px solid ${COLORS.copper}80`,
+                    borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: fontBody,
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  }}>
+                    <Plus size={12} /> Add for another campus
+                  </button>
+                ) : null}
               </div>
             </Card>
           );
@@ -4015,8 +4709,9 @@ const IntegrationsPage = () => {
 
       {editing && (
         <ConnectionModal
-          integration={editing}
-          existing={connections[editing.name]?.credentials}
+          integration={editing.integration}
+          existing={editing.connection?.credentials}
+          defaultScope={editing.mode === "add-campus" ? "campus" : "all"}
           onConnect={connect}
           onClose={() => setEditing(null)}
         />
@@ -4186,7 +4881,7 @@ const ReceiptModal = ({ ministry, onClose }) => {
 // MAIN APP
 // ============================================================
 
-export default function IRCChurchApp() {
+function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
   const [activePage, setActivePage] = useState("dashboard");
   const [activeCampus, setActiveCampus] = useState("all");
   const [receiptModal, setReceiptModal] = useState({ open: false, ministry: null });
@@ -4217,6 +4912,35 @@ export default function IRCChurchApp() {
     setMinistries((prev) => [...prev, ministry]);
     return uniqueId;
   };
+  // Recurring payments — single source of truth for monthly overhead.
+  // Calendar page edits flow back to Budget overhead, alerts, what-if, etc.
+  const [recurringPayments, setRecurringPayments] = useState(INITIAL_RECURRING_PAYMENTS);
+  const saveRecurringPayment = (p) => {
+    setRecurringPayments((prev) => {
+      const idx = prev.findIndex((x) => x.id === p.id);
+      if (idx === -1) return [...prev, p];
+      const next = [...prev];
+      next[idx] = p;
+      return next;
+    });
+  };
+  const deleteRecurringPayment = (id) => {
+    setRecurringPayments((prev) => prev.filter((x) => x.id !== id));
+  };
+
+  // Survival floor = essentials only (Facilities + People).
+  // Operating overhead = all recurring payments.
+  const operatingOverheadMo = useMemo(
+    () => recurringPayments.reduce((s, p) => s + p.amount, 0),
+    [recurringPayments]
+  );
+  const survivalFloorMo = useMemo(
+    () => recurringPayments
+      .filter((p) => p.category === "facilities" || p.category === "people")
+      .reduce((s, p) => s + p.amount, 0),
+    [recurringPayments]
+  );
+
   // Audit trail: every Roll/Return/Apply/Approve/Snooze appends one entry.
   // Activity page reads from this; nothing is mutated except via logActivity.
   const [activityLog, setActivityLog] = useState(INITIAL_ACTIVITY_LOG);
@@ -4252,6 +4976,7 @@ export default function IRCChurchApp() {
     donations: { t: "Donations", s: "All giving · all sources · all campuses" },
     expenses: { t: "Expenses", s: "Where the money goes" },
     budget: { t: "Budget", s: "Plan, monitor, stress-test — and stay on top of it" },
+    calendar: { t: "Calendar", s: "Recurring payments, scheduled events, and what's owed today" },
     ministries: { t: "Ministries", s: "Budget vs. actual for every department" },
     campuses: { t: "Campuses", s: "Main · Tacoma · New York" },
     administrators: { t: "Administrators", s: "Who oversees what — budgets that update as you reassign" },
@@ -4266,10 +4991,20 @@ export default function IRCChurchApp() {
   const content = useMemo(() => {
     const open = (m) => setReceiptModal({ open: true, ministry: m });
     switch (activePage) {
-      case "dashboard": return <DashboardPage ministries={ministries} />;
+      case "dashboard": return <DashboardPage ministries={ministries} operatingOverheadMo={operatingOverheadMo} survivalFloorMo={survivalFloorMo} />;
       case "donations": return <DonationsPage />;
       case "expenses": return <ExpensesPage />;
-      case "budget": return <BudgetPage ministries={ministries} updateMinistryBudget={updateMinistryBudget} logActivity={logActivity} />;
+      case "budget": return <BudgetPage
+        ministries={ministries} updateMinistryBudget={updateMinistryBudget} logActivity={logActivity}
+        recurringPayments={recurringPayments}
+        operatingOverheadMo={operatingOverheadMo}
+        survivalFloorMo={survivalFloorMo}
+      />;
+      case "calendar": return <CalendarPage
+        recurringPayments={recurringPayments}
+        savePayment={saveRecurringPayment}
+        deletePayment={deleteRecurringPayment}
+      />;
       case "ministries": return <MinistriesPage openReceiptModal={open} ministries={ministries} addMinistry={addMinistry} />;
       case "campuses": return <CampusesPage />;
       case "administrators": return <AdministratorsPage
@@ -4283,15 +5018,12 @@ export default function IRCChurchApp() {
       case "people": return <PeoplePage />;
       case "integrations": return <IntegrationsPage />;
       case "reports": return <ReportsPage />;
-      default: return <DashboardPage ministries={ministries} />;
+      default: return <DashboardPage ministries={ministries} operatingOverheadMo={operatingOverheadMo} survivalFloorMo={survivalFloorMo} />;
     }
-  }, [activePage, ministries, admins, activityLog]);
+  }, [activePage, ministries, admins, activityLog, recurringPayments, operatingOverheadMo, survivalFloorMo]);
 
   return (
-    <div style={{
-      display: "flex", minHeight: "100vh", backgroundColor: COLORS.bg,
-      fontFamily: fontBody, color: COLORS.ink,
-    }}>
+    <div style={{ minHeight: "100vh", backgroundColor: COLORS.bg, fontFamily: fontBody, color: COLORS.ink }}>
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
       <link
@@ -4307,6 +5039,10 @@ export default function IRCChurchApp() {
         ::-webkit-scrollbar-thumb:hover { background: ${COLORS.copper}; }
       `}</style>
 
+      {demo && <DemoBanner onExit={onExitDemo} />}
+
+      <div style={{ display: "flex", minHeight: demo ? "calc(100vh - 44px)" : "100vh" }}>
+
       <Sidebar activePage={activePage} setActivePage={setActivePage} />
       <main style={{ flex: 1, minWidth: 0 }}>
         <TopBar
@@ -4321,6 +5057,473 @@ export default function IRCChurchApp() {
       {receiptModal.open && (
         <ReceiptModal ministry={receiptModal.ministry} onClose={() => setReceiptModal({ open: false, ministry: null })} />
       )}
+
+      </div>
     </div>
   );
+}
+
+// ============================================================
+// SAAS WRAPPER — Landing, Login, DemoBanner, Router shell
+// ============================================================
+
+const DemoBanner = ({ onExit }) => (
+  <div style={{
+    backgroundColor: "#000", color: COLORS.ink, padding: "10px 24px",
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    borderBottom: `1px solid ${COLORS.copper}40`, fontSize: 12, fontFamily: fontBody,
+    position: "sticky", top: 0, zIndex: 50,
+  }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: COLORS.forest, boxShadow: `0 0 0 3px ${COLORS.forest}30` }} />
+      <span style={{ fontWeight: 700, color: COLORS.forest, textTransform: "uppercase", letterSpacing: 0.6, fontSize: 11 }}>Live demo</span>
+      <span style={{ color: COLORS.inkSoft }}>·</span>
+      <span style={{ color: COLORS.inkSoft }}>You're exploring real IRC Church 2025 data — feel free to click anything.</span>
+    </div>
+    <button onClick={onExit} style={{
+      background: "transparent", border: `1px solid ${COLORS.border}`, color: COLORS.ink,
+      padding: "5px 12px", borderRadius: 7, cursor: "pointer", fontFamily: fontBody, fontWeight: 600, fontSize: 11,
+      display: "flex", alignItems: "center", gap: 6,
+    }}>
+      ← Exit demo
+    </button>
+  </div>
+);
+
+const StewardLogo = ({ inverse = false }) => (
+  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+    <div style={{
+      width: 32, height: 32, borderRadius: 8, backgroundColor: COLORS.forest,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      color: COLORS.bg, fontFamily: fontDisplay, fontWeight: 700, fontSize: 18,
+    }}>S</div>
+    <div style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 700, color: inverse ? COLORS.bg : COLORS.ink, letterSpacing: -0.3 }}>Steward</div>
+  </div>
+);
+
+// ----- LANDING -----------------------------------------------
+
+const LANDING_FEATURES = [
+  { title: "Donations", color: COLORS.forest, icon: HandHeart, body: "Stripe, Square, ACH, and cash — every gift in one ledger, auto-coded to the right ministry." },
+  { title: "Budget", color: COLORS.copper, icon: Target, body: "Plan the year, monitor the month. Smart alerts before you slip. Stress-test against giving drops." },
+  { title: "Multi-campus", color: COLORS.amber, icon: Building2, body: "Roll up Tacoma + NY + Main into one P&L. Per-campus budgets and admins, one source of truth." },
+  { title: "Audit trail", color: COLORS.red, icon: Activity, body: "Every roll, return, budget change, and notification logged. Board-ready CSV export in one click." },
+  { title: "Scenarios", color: "#A78BFA", icon: Sparkles, body: "What-if sliders cascade through operating, surplus, and runway. Save scenarios for quarterly review." },
+  { title: "Forecasting", color: "#22D3EE", icon: TrendingUp, body: "12-month rolling forecast per ministry — past 6 actuals + next 6 projected from seasonal patterns." },
+];
+
+const PRICING = [
+  { tier: "Starter", price: "$79", per: "/ month", desc: "For churches under 200 members.", features: ["1 campus", "5 ministries", "Stripe + Square", "Email support"], popular: false },
+  { tier: "Growth", price: "$199", per: "/ month", desc: "Most popular — for established churches.", features: ["3 campuses", "Unlimited ministries", "All integrations", "Quarterly review", "Smart recommendations"], popular: true },
+  { tier: "Enterprise", price: "Custom", per: "", desc: "For multi-site networks and denominations.", features: ["Unlimited campuses", "Custom integrations", "SSO + SAML", "Dedicated success manager", "SLA"], popular: false },
+];
+
+const Landing = ({ onLogin, onSignup, onDemo }) => {
+  return (
+    <div style={{ backgroundColor: COLORS.bg, color: COLORS.ink, fontFamily: fontBody, minHeight: "100vh" }}>
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Manrope:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+      <style>{`
+        * { box-sizing: border-box; }
+        body { margin: 0; }
+      `}</style>
+
+      {/* NAV */}
+      <nav style={{
+        position: "sticky", top: 0, zIndex: 30, backgroundColor: COLORS.bg + "F0", backdropFilter: "blur(12px)",
+        borderBottom: `1px solid ${COLORS.borderSoft}`,
+        padding: "16px 40px", display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <StewardLogo />
+        <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
+          <a href="#features" style={{ color: COLORS.ink, fontSize: 13, fontWeight: 500, textDecoration: "none" }}>Features</a>
+          <a href="#pricing" style={{ color: COLORS.ink, fontSize: 13, fontWeight: 500, textDecoration: "none" }}>Pricing</a>
+          <a href="#churches" style={{ color: COLORS.ink, fontSize: 13, fontWeight: 500, textDecoration: "none" }}>Churches</a>
+          <button onClick={onLogin} style={{ background: "transparent", border: "none", color: COLORS.ink, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: fontBody }}>Log in</button>
+          <button onClick={onSignup} style={{
+            backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", padding: "10px 18px", borderRadius: 99,
+            fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody,
+          }}>
+            Start free trial
+          </button>
+        </div>
+      </nav>
+
+      {/* HERO */}
+      <section style={{ padding: "80px 40px 60px", maxWidth: 1180, margin: "0 auto", textAlign: "center" }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px", backgroundColor: COLORS.cream, borderRadius: 99, fontSize: 11, fontWeight: 700, color: COLORS.copper, letterSpacing: 0.5, textTransform: "uppercase" }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: COLORS.forest }} />
+          Trusted by 200+ churches
+        </div>
+        <h1 style={{ fontFamily: fontDisplay, fontSize: 76, fontWeight: 600, color: COLORS.ink, letterSpacing: -2.5, lineHeight: 1.02, margin: "26px 0 0", maxWidth: 920, marginLeft: "auto", marginRight: "auto" }}>
+          Every dollar in your church,<br />
+          finally <span style={{ fontFamily: fontSerif, fontStyle: "italic", color: COLORS.copper, fontWeight: 400 }}>accounted for.</span>
+        </h1>
+        <p style={{ fontSize: 18, color: COLORS.inkSoft, lineHeight: 1.5, marginTop: 22, maxWidth: 620, marginLeft: "auto", marginRight: "auto" }}>
+          Donations, budgets, ministries, receipts — connected to QuickBooks, watched by smart alerts, audited automatically. So pastors can lead without spreadsheets.
+        </p>
+        <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 32 }}>
+          <button onClick={onSignup} style={{ backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", padding: "16px 28px", borderRadius: 99, fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: fontBody, boxShadow: `0 12px 32px ${COLORS.forest}30` }}>
+            Start free trial
+          </button>
+          <button onClick={onDemo} style={{ backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, padding: "16px 28px", borderRadius: 99, fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: fontBody }}>
+            Try the live demo →
+          </button>
+        </div>
+      </section>
+
+      {/* DASHBOARD MOCKUP */}
+      <section style={{ padding: "0 40px 100px", maxWidth: 1180, margin: "0 auto" }}>
+        <div style={{ borderRadius: 16, overflow: "hidden", border: `1px solid ${COLORS.border}`, backgroundColor: COLORS.surface, boxShadow: `0 40px 100px rgba(212,255,0,0.08)` }}>
+          {/* browser chrome */}
+          <div style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 8, borderBottom: `1px solid ${COLORS.border}`, backgroundColor: COLORS.bg }}>
+            <div style={{ display: "flex", gap: 6 }}>
+              <span style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: "#FF5F57" }} />
+              <span style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: "#FEBC2E" }} />
+              <span style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: "#28C840" }} />
+            </div>
+            <div style={{ flex: 1, marginLeft: 16, padding: "5px 12px", backgroundColor: COLORS.cream, borderRadius: 6, fontSize: 11, color: COLORS.inkSoft, fontFamily: "ui-monospace, monospace", textAlign: "center" }}>
+              app.steward.church/dashboard
+            </div>
+          </div>
+          {/* preview body */}
+          <div style={{ padding: 28 }}>
+            <div style={{ fontFamily: fontSerif, fontSize: 22, fontStyle: "italic", color: COLORS.ink, marginBottom: 18 }}>Good morning, Pastor V.</div>
+            {/* health card */}
+            <div style={{ padding: 20, borderRadius: 12, backgroundColor: "rgba(212,255,0,0.06)", border: `1px solid ${COLORS.forest}40`, marginBottom: 18, display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 9, backgroundColor: COLORS.forest, color: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Gauge size={18} strokeWidth={2.4} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10, color: COLORS.forest, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>Budget Health · On track</div>
+                <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 600, color: COLORS.ink, marginTop: 4 }}>
+                  On pace to cover overhead with $162k to spare this month.
+                </div>
+              </div>
+            </div>
+            {/* KPIs */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 18 }}>
+              {[
+                { label: "Donations YTD", value: "$1.88M", color: COLORS.forest },
+                { label: "Expenses YTD", value: "$1.66M", color: COLORS.copper },
+                { label: "Net savings", value: "$224k", color: COLORS.green },
+                { label: "Year-end balance", value: "$926k", color: COLORS.ink },
+              ].map((k, i) => (
+                <div key={i} style={{ padding: 14, border: `1px solid ${COLORS.border}`, borderRadius: 9 }}>
+                  <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}>{k.label}</div>
+                  <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 600, color: k.color, marginTop: 4, letterSpacing: -0.5 }}>{k.value}</div>
+                </div>
+              ))}
+            </div>
+            {/* mini chart */}
+            <div style={{ padding: 16, border: `1px solid ${COLORS.border}`, borderRadius: 10 }}>
+              <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600, marginBottom: 10 }}>Monthly cash flow · 2025</div>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 70 }}>
+                {[55, 50, 62, 70, 64, 58, 55, 60, 67, 70, 65, 95].map((h, i) => (
+                  <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, alignItems: "center" }}>
+                    <div style={{ width: "100%", height: `${h}%`, backgroundColor: COLORS.forest, borderRadius: 2, opacity: 0.85 }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURES (dark) */}
+      <section id="features" style={{ backgroundColor: COLORS.bg, padding: "100px 40px", borderTop: `1px solid ${COLORS.borderSoft}` }}>
+        <div style={{ maxWidth: 1180, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 56 }}>
+            <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>What's inside</div>
+            <h2 style={{ fontFamily: fontDisplay, fontSize: 52, fontWeight: 600, color: COLORS.ink, letterSpacing: -1.5, marginTop: 10, lineHeight: 1.1 }}>
+              Everything stewardship,<br />
+              <span style={{ fontFamily: fontSerif, fontStyle: "italic", color: COLORS.copper, fontWeight: 400 }}>nothing else.</span>
+            </h2>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+            {LANDING_FEATURES.map((f) => {
+              const Icon = f.icon;
+              return (
+                <div key={f.title} style={{ padding: 24, backgroundColor: COLORS.surface, borderRadius: 14, border: `1px solid ${COLORS.border}`, position: "relative", overflow: "hidden" }}>
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, backgroundColor: f.color }} />
+                  <div style={{ width: 36, height: 36, borderRadius: 9, backgroundColor: f.color + "20", color: f.color, display: "flex", alignItems: "center", justifyContent: "center", marginTop: 6, marginBottom: 14 }}>
+                    <Icon size={17} />
+                  </div>
+                  <div style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 600, color: COLORS.ink }}>{f.title}</div>
+                  <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 6, lineHeight: 1.55 }}>{f.body}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* PRICING */}
+      <section id="pricing" style={{ padding: "100px 40px", borderTop: `1px solid ${COLORS.borderSoft}` }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 50 }}>
+            <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>Simple pricing</div>
+            <h2 style={{ fontFamily: fontDisplay, fontSize: 48, fontWeight: 600, color: COLORS.ink, letterSpacing: -1.3, marginTop: 10, lineHeight: 1.1 }}>
+              One price, every feature,<br />
+              <span style={{ fontFamily: fontSerif, fontStyle: "italic", color: COLORS.copper, fontWeight: 400 }}>no surprises.</span>
+            </h2>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, alignItems: "stretch" }}>
+            {PRICING.map((p) => (
+              <div key={p.tier} style={{
+                padding: 28, borderRadius: 16,
+                backgroundColor: p.popular ? COLORS.forest : COLORS.surface,
+                color: p.popular ? COLORS.bg : COLORS.ink,
+                border: p.popular ? "none" : `1px solid ${COLORS.border}`,
+                transform: p.popular ? "translateY(-12px)" : "none",
+                boxShadow: p.popular ? `0 20px 60px ${COLORS.forest}30` : "none",
+                position: "relative",
+              }}>
+                {p.popular && (
+                  <div style={{ position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)", padding: "4px 12px", backgroundColor: COLORS.copper, color: "#fff", borderRadius: 99, fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>
+                    Most popular
+                  </div>
+                )}
+                <div style={{ fontSize: 12, color: p.popular ? "rgba(0,0,0,0.6)" : COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>{p.tier}</div>
+                <div style={{ fontFamily: fontDisplay, fontSize: 48, fontWeight: 700, marginTop: 10, letterSpacing: -1.2, lineHeight: 1 }}>
+                  {p.price}<span style={{ fontSize: 16, fontWeight: 500, color: p.popular ? "rgba(0,0,0,0.6)" : COLORS.inkSoft }}>{p.per}</span>
+                </div>
+                <div style={{ fontSize: 13, color: p.popular ? "rgba(0,0,0,0.7)" : COLORS.inkSoft, marginTop: 6, lineHeight: 1.5 }}>{p.desc}</div>
+                <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 10 }}>
+                  {p.features.map((f) => (
+                    <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                      <Check size={14} strokeWidth={3} color={p.popular ? COLORS.bg : COLORS.forest} />
+                      {f}
+                    </div>
+                  ))}
+                </div>
+                <button onClick={onSignup} style={{
+                  width: "100%", marginTop: 26, padding: "12px 18px", borderRadius: 99,
+                  border: p.popular ? "none" : `1px solid ${COLORS.border}`,
+                  backgroundColor: p.popular ? COLORS.bg : "transparent",
+                  color: p.popular ? COLORS.forest : COLORS.ink,
+                  fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody,
+                }}>
+                  {p.tier === "Enterprise" ? "Talk to sales" : "Start free trial"}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FINAL CTA */}
+      <section style={{ padding: "60px 40px 100px" }}>
+        <div style={{
+          maxWidth: 1100, margin: "0 auto", padding: 56, borderRadius: 24,
+          backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}`, textAlign: "center", position: "relative", overflow: "hidden",
+          backgroundImage: `radial-gradient(circle at 20% 20%, ${COLORS.forest}25 0%, transparent 40%), radial-gradient(circle at 80% 80%, ${COLORS.copper}20 0%, transparent 40%)`,
+        }}>
+          <h2 style={{ fontFamily: fontDisplay, fontSize: 48, fontWeight: 600, color: COLORS.ink, letterSpacing: -1.3, lineHeight: 1.1, margin: 0 }}>
+            Stop guessing about money.<br />
+            <span style={{ fontFamily: fontSerif, fontStyle: "italic", color: COLORS.copper, fontWeight: 400 }}>Start leading with it.</span>
+          </h2>
+          <p style={{ fontSize: 16, color: COLORS.inkSoft, marginTop: 18, maxWidth: 540, marginLeft: "auto", marginRight: "auto", lineHeight: 1.6 }}>
+            14-day free trial. No credit card. Migrate from QuickBooks in under an hour.
+          </p>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 26 }}>
+            <button onClick={onSignup} style={{ backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", padding: "16px 28px", borderRadius: 99, fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: fontBody }}>
+              Start free trial
+            </button>
+            <button onClick={onDemo} style={{ backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, padding: "16px 28px", borderRadius: 99, fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: fontBody }}>
+              Try the live demo →
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer style={{ borderTop: `1px solid ${COLORS.borderSoft}`, padding: "20px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+        <StewardLogo />
+        <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 11, color: COLORS.inkSoft }}>
+          <span>© 2026 Steward · Built for the church</span>
+          <span style={{ padding: "2px 7px", border: `1px solid ${COLORS.border}`, borderRadius: 4, fontWeight: 600 }}>SOC 2</span>
+          <span style={{ padding: "2px 7px", border: `1px solid ${COLORS.border}`, borderRadius: 4, fontWeight: 600 }}>501(c)(3) friendly</span>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+// ----- LOGIN -------------------------------------------------
+
+const Login = ({ onSubmit, onDemo, onSignup, onBack }) => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const canSubmit = email.includes("@") && password.length >= 4;
+
+  return (
+    <div style={{ minHeight: "100vh", display: "grid", gridTemplateColumns: "1fr 1fr", backgroundColor: COLORS.bg, color: COLORS.ink, fontFamily: fontBody }}>
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Manrope:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+      <style>{`* { box-sizing: border-box; } body { margin: 0; }`}</style>
+
+      {/* LEFT — auth form */}
+      <div style={{ padding: 48, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <button onClick={onBack} style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer" }}>
+            <StewardLogo />
+          </button>
+        </div>
+        <div style={{ maxWidth: 420, width: "100%", margin: "auto 0", paddingTop: 40 }}>
+          <h1 style={{ fontFamily: fontDisplay, fontSize: 44, fontWeight: 600, color: COLORS.ink, letterSpacing: -1.2, lineHeight: 1.05, margin: 0 }}>
+            Welcome <span style={{ fontFamily: fontSerif, fontStyle: "italic", color: COLORS.copper, fontWeight: 400 }}>back.</span>
+          </h1>
+          <p style={{ fontSize: 14, color: COLORS.inkSoft, marginTop: 10, marginBottom: 28 }}>
+            Sign in to manage your church's finances.
+          </p>
+
+          {/* SSO */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
+            <button onClick={onSubmit} style={{ width: "100%", padding: "12px 16px", backgroundColor: COLORS.surface, color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+              <span style={{ width: 18, height: 18, borderRadius: 4, backgroundColor: "#fff", color: "#000", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>G</span>
+              Continue with Google
+            </button>
+            <button onClick={onSubmit} style={{ width: "100%", padding: "12px 16px", backgroundColor: COLORS.surface, color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+              <span style={{ width: 18, height: 18, borderRadius: 3, backgroundColor: "#0078D4", color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>M</span>
+              Continue with Microsoft
+            </button>
+          </div>
+
+          {/* divider */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+            <div style={{ flex: 1, height: 1, backgroundColor: COLORS.border }} />
+            <span style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}>or</span>
+            <div style={{ flex: 1, height: 1, backgroundColor: COLORS.border }} />
+          </div>
+
+          {/* email/password */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Email</label>
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@yourchurch.org"
+                style={{ display: "block", width: "100%", padding: "12px 14px", marginTop: 4, fontSize: 14, fontFamily: fontBody, color: COLORS.ink, backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 9, outline: "none", boxSizing: "border-box" }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                onKeyDown={(e) => { if (e.key === "Enter" && canSubmit) onSubmit(); }}
+                style={{ display: "block", width: "100%", padding: "12px 14px", marginTop: 4, fontSize: 14, fontFamily: fontBody, color: COLORS.ink, backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 9, outline: "none", boxSizing: "border-box" }}
+              />
+            </div>
+            <button
+              onClick={onSubmit}
+              disabled={!canSubmit}
+              style={{
+                width: "100%", marginTop: 8, padding: "13px 18px", borderRadius: 9, border: "none",
+                backgroundColor: canSubmit ? COLORS.forest : COLORS.cream,
+                color: canSubmit ? COLORS.bg : COLORS.inkSoft,
+                fontWeight: 700, fontSize: 14, cursor: canSubmit ? "pointer" : "not-allowed", fontFamily: fontBody,
+                boxShadow: canSubmit ? `0 10px 28px ${COLORS.forest}30` : "none",
+              }}
+            >
+              Sign in
+            </button>
+          </div>
+
+          {/* demo callout */}
+          <button onClick={onDemo} style={{ width: "100%", marginTop: 18, padding: "12px 16px", backgroundColor: "#000", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Sparkles size={13} color={COLORS.copper} />
+              Just exploring? Open demo
+            </span>
+            <span>→</span>
+          </button>
+
+          <div style={{ textAlign: "center", marginTop: 22, fontSize: 13, color: COLORS.inkSoft }}>
+            New to Steward?{" "}
+            <button onClick={onSignup} style={{ background: "transparent", border: "none", color: COLORS.forest, fontWeight: 700, cursor: "pointer", fontFamily: fontBody, padding: 0, fontSize: 13 }}>
+              Start a free trial →
+            </button>
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: COLORS.inkSoft }}>© 2026 Steward · SOC 2 · GDPR</div>
+      </div>
+
+      {/* RIGHT — testimonial */}
+      <div style={{
+        backgroundColor: "#000", padding: 48, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between",
+        backgroundImage: `radial-gradient(circle at 20% 30%, ${COLORS.forest}1f 0%, transparent 50%), radial-gradient(circle at 80% 70%, ${COLORS.copper}1a 0%, transparent 50%)`,
+      }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px", backgroundColor: COLORS.cream, borderRadius: 99, fontSize: 11, fontWeight: 700, color: COLORS.copper, letterSpacing: 0.5, textTransform: "uppercase", alignSelf: "flex-start" }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: COLORS.forest }} />
+          200+ churches trust Steward
+        </div>
+
+        <div>
+          <div style={{ fontFamily: fontSerif, fontStyle: "italic", fontSize: 38, color: COLORS.ink, lineHeight: 1.2, fontWeight: 400, letterSpacing: -1 }}>
+            "We stopped guessing about money and started <span style={{ color: COLORS.forest }}>leading with it.</span>"
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 26 }}>
+            <div style={{ width: 44, height: 44, borderRadius: "50%", backgroundColor: COLORS.forest, color: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>PV</div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>Pastor Vladimir</div>
+              <div style={{ fontSize: 12, color: COLORS.inkSoft }}>Senior Pastor · IRC Church · 1,500 members</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+          {[
+            { label: "2025 donations", value: "$1.88M" },
+            { label: "Ministries", value: "14" },
+            { label: "Years on Steward", value: "3" },
+          ].map((s, i) => (
+            <div key={i} style={{ padding: 14, borderRadius: 10, border: `1px solid ${COLORS.border}`, backgroundColor: "rgba(255,255,255,0.02)" }}>
+              <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>{s.label}</div>
+              <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 600, color: COLORS.ink, marginTop: 4, letterSpacing: -0.5 }}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ----- ROUTER SHELL ------------------------------------------
+
+// Simple hash-based routing. /#/login, /#/app, /#/demo, default = landing.
+const parseRoute = () => {
+  const h = (window.location.hash || "").replace(/^#\/?/, "");
+  if (h === "login") return { route: "login", demo: false };
+  if (h === "demo") return { route: "app", demo: true };
+  if (h === "app") return { route: "app", demo: false };
+  return { route: "landing", demo: false };
+};
+const setHash = (h) => { window.location.hash = h; };
+
+export default function App() {
+  const [{ route, demo }, setState] = useState(parseRoute());
+
+  React.useEffect(() => {
+    const handler = () => setState(parseRoute());
+    window.addEventListener("hashchange", handler);
+    return () => window.removeEventListener("hashchange", handler);
+  }, []);
+
+  const goLanding = () => setHash("");
+  const goLogin = () => setHash("/login");
+  const goApp = () => setHash("/app");
+  const goDemo = () => setHash("/demo");
+
+  if (route === "login") {
+    return <Login onSubmit={goApp} onDemo={goDemo} onSignup={goLogin} onBack={goLanding} />;
+  }
+  if (route === "app") {
+    return <IRCChurchApp demo={demo} onExitDemo={goLanding} />;
+  }
+  return <Landing onLogin={goLogin} onSignup={goLogin} onDemo={goDemo} />;
 }
