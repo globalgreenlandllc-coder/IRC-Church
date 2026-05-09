@@ -19,21 +19,74 @@ import { RULES as ALERT_RULES, evaluate as evaluateAlerts, buildContext as build
 // ============================================================
 // DESIGN TOKENS
 // ============================================================
-const COLORS = {
-  bg: "#0A0A0A",          // page canvas
-  surface: "#141414",     // card surface
-  ink: "#FAFAFA",         // primary text on dark
-  inkSoft: "#A0A0A0",     // muted text
-  forest: "#D4FF00",      // PRIMARY (lime) — was forest green
-  forestDeep: "#000000",  // deep black accent
-  copper: "#FF5A1F",      // SECONDARY (orange) — was copper brown
-  copperSoft: "#FFB088",  // light orange tint
-  cream: "#1F1F1F",       // tinted dark surface (was light beige)
-  border: "#2A2A2A",      // standard border
-  borderSoft: "#1A1A1A",  // softer / lower contrast border
-  green: "#4ADE80",       // success
-  red: "#FF3B8A",         // danger / IRC pink — was brick red
-  amber: "#FBBF24",       // warning
+// Two themes — same keys, swap-in on demand. Brand accents (lime, copper)
+// stay constant; the canvas, surfaces, ink, and status colors shift.
+const THEME_DARK = {
+  bg: "#0A0A0A",
+  surface: "#141414",
+  ink: "#FAFAFA",
+  inkSoft: "#A0A0A0",
+  forest: "#D4FF00",      // lime — always used as a BACKGROUND color (chips, buttons, accents)
+  forestText: "#D4FF00",  // accent for TEXT — lime works on dark surfaces
+  forestDeep: "#000000",  // dark accent / sidebar / "dark island" cards (constant)
+  copper: "#FF5A1F",
+  copperSoft: "#FFB088",
+  cream: "#1F1F1F",       // tinted elevated surface
+  border: "#2A2A2A",
+  borderSoft: "#1A1A1A",
+  green: "#4ADE80",
+  red: "#FF3B8A",
+  amber: "#FBBF24",
+};
+
+const THEME_LIGHT = {
+  bg: "#FBF7F0",          // warm cream canvas
+  surface: "#FFFFFF",     // pure white cards
+  ink: "#0A0A0A",         // near-black text
+  inkSoft: "#5C5C5C",     // medium gray
+  forest: "#D4FF00",      // lime stays as bg
+  forestText: "#0A8E2E",  // deep grass-green for text (lime on cream is invisible)
+  forestDeep: "#000000",  // stays — sidebar + dark islands always dark
+  copper: "#FF5A1F",      // orange stays
+  copperSoft: "#FFB088",
+  cream: "#F5F1E9",       // slightly darker cream for tinted/elevated surfaces
+  border: "rgba(0,0,0,0.10)",
+  borderSoft: "rgba(0,0,0,0.05)",
+  green: "#3FA961",       // deeper, readable on cream
+  red: "#E11D74",         // deeper pink
+  amber: "#E08826",       // deeper amber
+};
+
+let _activeTheme = THEME_DARK;
+const setActiveTheme = (mode) => {
+  _activeTheme = mode === "light" ? THEME_LIGHT : THEME_DARK;
+};
+
+// Proxy that reads from _activeTheme on every property access.
+// Components don't need to subscribe — when React re-renders after a
+// theme change, every inline style.{}={ color: COLORS.ink } reads fresh.
+const COLORS = new Proxy({}, {
+  get: (_, key) => _activeTheme[key],
+});
+
+// Constant text colors for high-contrast use on bright brand backgrounds.
+// These are theme-independent — picked from accessibility math (WCAG AA+).
+const INVERSE_INK = "#FAFAFA";  // for text on always-dark surfaces (sidebar, dark hero cards)
+const ON_LIME    = "#0A0A0A";  // text on lime (#D4FF00 vs #0A0A0A = 16.5:1)
+const ON_COPPER  = "#FFFFFF";  // text on copper/orange (#FF5A1F vs #FFFFFF = 4.75:1)
+const ON_PINK    = "#FFFFFF";  // text on pink (#FF3B8A vs #FFFFFF = 3.91:1, large/bold)
+const ON_AMBER   = "#0A0A0A";  // text on amber/yellow (#FBBF24 vs #0A0A0A = 13:1)
+const ON_GREEN   = "#0A0A0A";  // text on green (#4ADE80 vs #0A0A0A = 11.4:1)
+
+// Pick black or white text based on a background color's luminance.
+// Used for campus badges, ministry chips, and any bright-color background.
+const textOnBg = (hex) => {
+  if (!hex || hex.length < 7) return "#FFFFFF";
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const luma = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luma > 0.55 ? "#0A0A0A" : "#FFFFFF";
 };
 
 const fontDisplay = `'Bricolage Grotesque', -apple-system, sans-serif`;
@@ -70,20 +123,20 @@ const ADMIN_EXPENSES = [
 ];
 
 const MINISTRIES = [
-  { id: "worship", name: "Worship", spent: 17625.73, budget: 22000, leader: "Anna K.", campus: "main", color: "#D4FF00", icon: "♪" },          // lime
-  { id: "technical", name: "Technical", spent: 33531.65, budget: 38000, leader: "Mark D.", campus: "main", color: "#FF5A1F", icon: "⚙" },     // orange
-  { id: "video", name: "Video", spent: 5547.85, budget: 8000, leader: "Sergei P.", campus: "main", color: "#FF3B8A", icon: "▶" },             // pink
-  { id: "light-screen", name: "Light & Screen", spent: 2019.90, budget: 3500, leader: "Tom B.", campus: "main", color: "#FBBF24", icon: "✦" },// yellow
-  { id: "media", name: "Media", spent: 6590.64, budget: 9000, leader: "Lana V.", campus: "main", color: "#A78BFA", icon: "◈" },               // purple
-  { id: "kids", name: "Kids Ministry", spent: 16850.34, budget: 20000, leader: "Maria R.", campus: "main", color: "#22D3EE", icon: "✧" },     // teal
-  { id: "teens", name: "Teens", spent: 5615.34, budget: 8000, leader: "David O.", campus: "main", color: "#F472B6", icon: "♦" },              // rose
-  { id: "youth", name: "Youth", spent: 9161.67, budget: 12000, leader: "Eli T.", campus: "main", color: "#4ADE80", icon: "▲" },               // green
-  { id: "single-mom", name: "Single Moms", spent: 6073.25, budget: 8000, leader: "Olga S.", campus: "main", color: "#FB923C", icon: "♥" },    // peach
-  { id: "deaf", name: "Deaf & Hard of Hearing", spent: 3082.89, budget: 5000, leader: "Ruth M.", campus: "main", color: "#60A5FA", icon: "✋" },// sky
-  { id: "legacy", name: "Legacy", spent: 2124.07, budget: 4000, leader: "John W.", campus: "main", color: "#FACC15", icon: "✚" },             // gold
-  { id: "services", name: "Sun/Fri Services & Care", spent: 57334.39, budget: 65000, leader: "Pastor Vlad", campus: "main", color: "#D4FF00", icon: "✟" }, // lime
-  { id: "target", name: "Target Outreach", spent: 11518.67, budget: 15000, leader: "Anna K.", campus: "main", color: "#FF5A1F", icon: "◎" },  // orange
-  { id: "merch", name: "Merch", spent: 13178.36, budget: 14000, leader: "Sasha L.", campus: "main", color: "#FF3B8A", icon: "◇" },            // pink
+  { id: "worship", name: "Worship", spent: 17625.73, budget: 22000, leader: "Anna K.", campusId: "bellevue", color: "#D4FF00", icon: "♪" },
+  { id: "technical", name: "Technical", spent: 33531.65, budget: 38000, leader: "Mark D.", campusId: "bellevue", color: "#FF5A1F", icon: "⚙" },
+  { id: "video", name: "Video", spent: 5547.85, budget: 8000, leader: "Sergei P.", campusId: "bellevue", color: "#FF3B8A", icon: "▶" },
+  { id: "light-screen", name: "Light & Screen", spent: 2019.90, budget: 3500, leader: "Tom B.", campusId: "bellevue", color: "#FBBF24", icon: "✦" },
+  { id: "media", name: "Media", spent: 6590.64, budget: 9000, leader: "Lana V.", campusId: "bellevue", color: "#A78BFA", icon: "◈" },
+  { id: "kids", name: "Kids Ministry", spent: 16850.34, budget: 20000, leader: "Maria R.", campusId: "bellevue", color: "#22D3EE", icon: "✧" },
+  { id: "teens", name: "Teens", spent: 5615.34, budget: 8000, leader: "David O.", campusId: "bellevue", color: "#F472B6", icon: "♦" },
+  { id: "youth", name: "Youth", spent: 9161.67, budget: 12000, leader: "Eli T.", campusId: "bellevue", color: "#4ADE80", icon: "▲" },
+  { id: "single-mom", name: "Single Moms", spent: 6073.25, budget: 8000, leader: "Olga S.", campusId: "bellevue", color: "#FB923C", icon: "♥" },
+  { id: "services", name: "Sun/Fri Services & Care", spent: 57334.39, budget: 65000, leader: "Pastor Vlad", campusId: "bellevue", color: "#D4FF00", icon: "✟" },
+  { id: "merch", name: "Merch", spent: 13178.36, budget: 14000, leader: "Sasha L.", campusId: "bellevue", color: "#FF3B8A", icon: "◇" },
+  { id: "deaf", name: "Deaf & Hard of Hearing", spent: 3082.89, budget: 5000, leader: "Ruth M.", campusId: "everett", color: "#60A5FA", icon: "✋" },
+  { id: "target", name: "Target Outreach", spent: 11518.67, budget: 15000, leader: "Anna K.", campusId: "everett", color: "#FF5A1F", icon: "◎" },
+  { id: "legacy", name: "Legacy", spent: 2124.07, budget: 4000, leader: "John W.", campusId: "tacoma", color: "#FACC15", icon: "✚" },
 ];
 
 const EVENTS_CAMPS = [
@@ -114,23 +167,32 @@ const EVENTS_CAMPS = [
 
 const TEAM = [
   { name: "Pastor Vladimir", email: "vlad@ircchurch.org", role: "Senior Pastor", access: "Full Admin", avatar: "PV", lastActive: "Active now", campus: "All" },
-  { name: "Anna Kovalenko", email: "anna@ircchurch.org", role: "Worship Leader", access: "Ministry Leader", avatar: "AK", lastActive: "2h ago", campus: "Main" },
-  { name: "Maria Rojas", email: "maria@ircchurch.org", role: "Kids Director", access: "Ministry Leader", avatar: "MR", lastActive: "Yesterday", campus: "Main" },
-  { name: "Sergei Popov", email: "sergei@ircchurch.org", role: "Video Lead", access: "Ministry Leader", avatar: "SP", lastActive: "3d ago", campus: "Main" },
+  { name: "Anna Kovalenko", email: "anna@ircchurch.org", role: "Worship Leader", access: "Ministry Leader", avatar: "AK", lastActive: "2h ago", campus: "Bellevue" },
+  { name: "Maria Rojas", email: "maria@ircchurch.org", role: "Kids Director", access: "Ministry Leader", avatar: "MR", lastActive: "Yesterday", campus: "Bellevue" },
+  { name: "Sergei Popov", email: "sergei@ircchurch.org", role: "Video Lead", access: "Ministry Leader", avatar: "SP", lastActive: "3d ago", campus: "Bellevue" },
   { name: "Elena Volkov", email: "elena@ircchurch.org", role: "Treasurer", access: "Finance Admin", avatar: "EV", lastActive: "Active now", campus: "All" },
-  { name: "James Chen", email: "james@ircchurch.org", role: "NY Campus Pastor", access: "Campus Admin", avatar: "JC", lastActive: "5h ago", campus: "New York" },
-  { name: "Olga Smirnova", email: "olga@ircchurch.org", role: "Single Moms Lead", access: "Ministry Leader", avatar: "OS", lastActive: "1d ago", campus: "Main" },
+  { name: "James Chen", email: "james@ircchurch.org", role: "Brooklyn Campus Pastor", access: "Campus Admin", avatar: "JC", lastActive: "5h ago", campus: "Brooklyn" },
+  { name: "Olga Smirnova", email: "olga@ircchurch.org", role: "Single Moms Lead", access: "Ministry Leader", avatar: "OS", lastActive: "1d ago", campus: "Bellevue" },
   { name: "Marcus Tate", email: "marcus@ircchurch.org", role: "Tacoma Campus Pastor", access: "Campus Admin", avatar: "MT", lastActive: "30m ago", campus: "Tacoma" },
+];
+
+// Campuses — single source of truth. Lifted to IRCChurchApp state.
+// Bellevue is HQ; Everett, Tacoma, Brooklyn are satellites.
+const INITIAL_CAMPUSES = [
+  { id: "bellevue", name: "Bellevue", address: "Bellevue, WA", isHQ: true,  short: "B", color: "#D4FF00", donations: 1500000.00, expenses: 1300000.00, members: 950, ministries: 11 },
+  { id: "everett",  name: "Everett",  address: "Everett, WA",  isHQ: false, short: "E", color: "#FF5A1F", donations: 314440.00,  expenses: 306278.00,  members: 290, ministries: 5  },
+  { id: "tacoma",   name: "Tacoma",   address: "Tacoma, WA",   isHQ: false, short: "T", color: "#FF3B8A", donations: 24262.53,   expenses: 30005.99,   members: 180, ministries: 4  },
+  { id: "brooklyn", name: "Brooklyn", address: "Brooklyn, NY", isHQ: false, short: "K", color: "#A78BFA", donations: 44000.00,   expenses: 21486.89,   members: 95,  ministries: 3  },
 ];
 
 const ADMINISTRATORS = [
   { id: "vlad", name: "Pastor Vladimir", avatar: "PV", type: "executive", campus: "All", title: "Senior Pastor", bio: "Vision, preaching, and pastoral care across all campuses." },
-  { id: "anna", name: "Anna Kovalenko", avatar: "AK", type: "function", campus: "Main", title: "Creative Arts Director", bio: "Oversees worship, sound, video, lighting, and media production." },
-  { id: "maria", name: "Maria Rojas", avatar: "MR", type: "function", campus: "Main", title: "Family & Next Gen", bio: "Children, teens, and young adults — full discipleship pipeline." },
-  { id: "olga", name: "Olga Smirnova", avatar: "OS", type: "function", campus: "Main", title: "Care & Outreach", bio: "Single moms, deaf community, and target outreach initiatives." },
+  { id: "anna", name: "Anna Kovalenko", avatar: "AK", type: "function", campus: "Bellevue", title: "Creative Arts Director", bio: "Oversees worship, sound, video, lighting, and media production." },
+  { id: "maria", name: "Maria Rojas", avatar: "MR", type: "function", campus: "Bellevue", title: "Family & Next Gen", bio: "Children, teens, and young adults — full discipleship pipeline." },
+  { id: "olga", name: "Olga Smirnova", avatar: "OS", type: "function", campus: "Bellevue", title: "Care & Outreach", bio: "Single moms, deaf community, and target outreach initiatives." },
   { id: "elena", name: "Elena Volkov", avatar: "EV", type: "function", campus: "All", title: "Finance & Operations", bio: "Books, payroll, vendor relations, and the merch table." },
   { id: "marcus", name: "Marcus Tate", avatar: "MT", type: "campus", campus: "Tacoma", title: "Tacoma Campus Pastor", bio: "Launching Tacoma — building local ministry infrastructure." },
-  { id: "james", name: "James Chen", avatar: "JC", type: "campus", campus: "New York", title: "NY Campus Pastor", bio: "Stewarding the New York launch — gathering, preaching, and care." },
+  { id: "james", name: "James Chen", avatar: "JC", type: "campus", campus: "Brooklyn", title: "Brooklyn Campus Pastor", bio: "Stewarding the Brooklyn launch — gathering, preaching, and care." },
 ];
 
 const INITIAL_ASSIGNMENTS = {
@@ -236,20 +298,21 @@ const LAST_MONTH_SPEND = {
 
 // Recurring payments — fire on a fixed day every month, auto-roll forward.
 const INITIAL_RECURRING_PAYMENTS = [
-  { id: "rent-everett",   name: "Everett Rent",                 amount: 24500, dayOfMonth: 1,  category: "facilities", note: "Main campus lease" },
-  { id: "rent-tacoma",    name: "Tacoma Rent",                  amount: 4200,  dayOfMonth: 1,  category: "facilities", note: null },
-  { id: "rent-nyc",       name: "NYC Rent",                     amount: 5800,  dayOfMonth: 1,  category: "facilities", note: null },
-  { id: "missions",       name: "Monthly Missions Support",     amount: 2500,  dayOfMonth: 1,  category: "ministry",   note: "Partner ministries" },
-  { id: "insurance",      name: "Insurance Premium",            amount: 2840,  dayOfMonth: 5,  category: "facilities", note: null },
-  { id: "cleaning",       name: "Cleaning Service",             amount: 1800,  dayOfMonth: 5,  category: "facilities", note: null },
-  { id: "utilities",      name: "Utilities (Electric + Gas)",   amount: 4200,  dayOfMonth: 8,  category: "facilities", note: null },
-  { id: "internet",       name: "Internet & Phone",             amount: 480,   dayOfMonth: 10, category: "operations", note: null },
-  { id: "software",       name: "Software Subscriptions",       amount: 320,   dayOfMonth: 12, category: "operations", note: "PCO, Canva, Mailchimp, Zoom" },
-  { id: "payroll-mid",    name: "Mid-month Payroll",            amount: 17500, dayOfMonth: 15, category: "people",     note: "8 staff" },
-  { id: "equipment",      name: "Equipment Lease",              amount: 850,   dayOfMonth: 15, category: "operations", note: "Audio booth + camera" },
-  { id: "office-supplies",name: "Office Supplies",              amount: 350,   dayOfMonth: 20, category: "operations", note: null },
-  { id: "bank-fees",      name: "Bank Fees",                    amount: 220,   dayOfMonth: 28, category: "operations", note: null },
-  { id: "payroll-end",    name: "End-month Payroll",            amount: 17500, dayOfMonth: 30, category: "people",     note: "8 staff" },
+  { id: "rent-bellevue",  name: "Bellevue Rent",                amount: 24500, dayOfMonth: 1,  category: "facilities", note: "HQ campus lease",       campusId: "bellevue" },
+  { id: "rent-everett",   name: "Everett Rent",                 amount: 4800,  dayOfMonth: 1,  category: "facilities", note: null,                    campusId: "everett" },
+  { id: "rent-tacoma",    name: "Tacoma Rent",                  amount: 4200,  dayOfMonth: 1,  category: "facilities", note: null,                    campusId: "tacoma" },
+  { id: "rent-brooklyn",  name: "Brooklyn Rent",                amount: 5800,  dayOfMonth: 1,  category: "facilities", note: null,                    campusId: "brooklyn" },
+  { id: "missions",       name: "Monthly Missions Support",     amount: 2500,  dayOfMonth: 1,  category: "ministry",   note: "Partner ministries",    campusId: "bellevue" },
+  { id: "insurance",      name: "Insurance Premium",            amount: 2840,  dayOfMonth: 5,  category: "facilities", note: "Org-wide policy",       campusId: "bellevue" },
+  { id: "cleaning",       name: "Cleaning Service",             amount: 1800,  dayOfMonth: 5,  category: "facilities", note: null,                    campusId: "bellevue" },
+  { id: "utilities",      name: "Utilities (Electric + Gas)",   amount: 4200,  dayOfMonth: 8,  category: "facilities", note: "HQ campus",             campusId: "bellevue" },
+  { id: "internet",       name: "Internet & Phone",             amount: 480,   dayOfMonth: 10, category: "operations", note: "Org-wide",              campusId: "bellevue" },
+  { id: "software",       name: "Software Subscriptions",       amount: 320,   dayOfMonth: 12, category: "operations", note: "PCO, Canva, Mailchimp", campusId: "bellevue" },
+  { id: "payroll-mid",    name: "Mid-month Payroll",            amount: 17500, dayOfMonth: 15, category: "people",     note: "8 staff (org-wide)",    campusId: "bellevue" },
+  { id: "equipment",      name: "Equipment Lease",              amount: 850,   dayOfMonth: 15, category: "operations", note: "Audio booth + camera",  campusId: "bellevue" },
+  { id: "office-supplies",name: "Office Supplies",              amount: 350,   dayOfMonth: 20, category: "operations", note: null,                    campusId: "bellevue" },
+  { id: "bank-fees",      name: "Bank Fees",                    amount: 220,   dayOfMonth: 28, category: "operations", note: null,                    campusId: "bellevue" },
+  { id: "payroll-end",    name: "End-month Payroll",            amount: 17500, dayOfMonth: 30, category: "people",     note: "8 staff (org-wide)",    campusId: "bellevue" },
 ];
 
 // One-time scheduled events with full date.
@@ -411,7 +474,7 @@ const Pill = ({ children, tone = "neutral" }) => {
     success: { bg: "rgba(74,222,128,0.16)", color: "#4ADE80" },
     warn: { bg: "rgba(251,191,36,0.18)", color: "#FBBF24" },
     danger: { bg: "rgba(255,59,138,0.18)", color: "#FF3B8A" },
-    forest: { bg: "#D4FF00", color: "#0A0A0A" },
+    forest: { bg: COLORS.forest, color: ON_LIME },
     copper: { bg: "rgba(255,90,31,0.18)", color: "#FF5A1F" },
   };
   const s = tones[tone] || tones.neutral;
@@ -520,11 +583,12 @@ const Sidebar = ({ activePage, setActivePage }) => {
     { id: "people", label: "People & Roles", icon: Shield },
     { id: "integrations", label: "Integrations", icon: Plug },
     { id: "reports", label: "Reports", icon: FileText },
+    { id: "settings", label: "Settings", icon: Settings },
   ];
 
   return (
     <aside style={{
-      width: 248, backgroundColor: COLORS.forestDeep, color: COLORS.ink,
+      width: 248, backgroundColor: COLORS.forestDeep, color: INVERSE_INK,
       display: "flex", flexDirection: "column", padding: "24px 0",
       borderRight: `1px solid ${COLORS.border}`, height: "100vh", position: "sticky", top: 0,
     }}>
@@ -572,7 +636,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: "50%", backgroundColor: COLORS.copper, color: COLORS.forestDeep, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12 }}>EV</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>Elena Volkov</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: INVERSE_INK }}>Elena Volkov</div>
             <div style={{ fontSize: 11, color: "rgba(250,250,250,0.55)" }}>Finance Admin</div>
           </div>
           <Settings size={15} style={{ color: "rgba(250,250,250,0.55)", cursor: "pointer" }} />
@@ -586,15 +650,17 @@ const Sidebar = ({ activePage, setActivePage }) => {
 // TOP BAR
 // ============================================================
 
-const TopBar = ({ activeCampus, setActiveCampus, pageTitle, pageSubtitle }) => {
+const TopBar = ({ activeCampus, setActiveCampus, pageTitle, pageSubtitle, campuses: campusesData }) => {
   const [campusOpen, setCampusOpen] = useState(false);
   const campuses = [
     { id: "all", name: "All Campuses", desc: "Consolidated view" },
-    { id: "main", name: "Main · Everett", desc: "WA · Primary" },
-    { id: "tacoma", name: "Tacoma", desc: "WA · Campus" },
-    { id: "ny", name: "New York", desc: "NY · Campus" },
+    ...campusesData.map((c) => ({
+      id: c.id,
+      name: c.isHQ ? `${c.name} · HQ` : c.name,
+      desc: `${c.address.split(",").pop().trim()} · ${c.isHQ ? "Primary" : "Campus"}`,
+    })),
   ];
-  const current = campuses.find((c) => c.id === activeCampus);
+  const current = campuses.find((c) => c.id === activeCampus) || campuses[0];
 
   return (
     <div style={{
@@ -626,7 +692,7 @@ const TopBar = ({ activeCampus, setActiveCampus, pageTitle, pageSubtitle }) => {
             onClick={() => setCampusOpen(!campusOpen)}
             style={{
               display: "flex", alignItems: "center", gap: 10, padding: "9px 14px",
-              backgroundColor: COLORS.forest, color: COLORS.bg, border: "none",
+              backgroundColor: COLORS.forest, color: ON_LIME, border: "none",
               borderRadius: 10, cursor: "pointer", fontFamily: fontBody, fontSize: 13, fontWeight: 600
             }}
           >
@@ -773,7 +839,8 @@ const BudgetHealthCard = ({ ministries, operatingOverheadMo, survivalFloorMo }) 
 // DASHBOARD PAGE
 // ============================================================
 
-const DashboardPage = ({ ministries, operatingOverheadMo, survivalFloorMo }) => {
+const DashboardPage = ({ ministries, operatingOverheadMo, survivalFloorMo, activeCampus, campuses }) => {
+  const currentCampus = campuses?.find((c) => c.id === activeCampus);
   const kpis = [
     { label: "Total Donations '25", value: fmt(TOTAL_DONATIONS), trend: "+12.4%", icon: HandHeart, tone: "forest" },
     { label: "Total Expenses '25", value: fmt(TOTAL_EXPENSES), trend: "88.05% of donations", icon: Receipt, tone: "copper" },
@@ -783,6 +850,20 @@ const DashboardPage = ({ ministries, operatingOverheadMo, survivalFloorMo }) => 
 
   return (
     <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 24 }}>
+      {currentCampus && (
+        <Card style={{ padding: "12px 18px", display: "flex", alignItems: "center", gap: 12, borderColor: currentCampus.color + "60", background: currentCampus.color + "10" }}>
+          <div style={{ width: 28, height: 28, borderRadius: 7, backgroundColor: currentCampus.color, color: textOnBg(currentCampus.color), display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fontDisplay, fontWeight: 700, fontSize: 13 }}>
+            {currentCampus.short}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Viewing</div>
+            <div style={{ fontSize: 14, color: COLORS.ink, fontWeight: 700 }}>{currentCampus.name} {currentCampus.isHQ ? "· HQ" : ""}</div>
+          </div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, fontStyle: "italic" }}>
+            Use the campus dropdown (top-right) to switch · "All Campuses" for the consolidated rollup
+          </div>
+        </Card>
+      )}
       <BudgetHealthCard ministries={ministries} operatingOverheadMo={operatingOverheadMo} survivalFloorMo={survivalFloorMo} />
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
@@ -938,7 +1019,7 @@ const DashboardPage = ({ ministries, operatingOverheadMo, survivalFloorMo }) => 
       </div>
 
       {/* Camp/Retreat strip */}
-      <Card style={{ padding: 24, backgroundColor: COLORS.forestDeep, color: COLORS.ink, border: "none" }}>
+      <Card style={{ padding: 24, backgroundColor: COLORS.forestDeep, color: INVERSE_INK, border: "none" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <div>
             <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 500, fontStyle: "italic" }}>Camps & retreats, 2025</div>
@@ -980,7 +1061,7 @@ const DonationsPage = () => {
             <div style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 500, color: COLORS.ink, fontStyle: "italic" }}>Live giving sources</div>
             <div style={{ fontSize: 12, color: COLORS.inkSoft }}>Connected payment platforms · synced every 15 min</div>
           </div>
-          <button style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: COLORS.bg, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
+          <button style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: ON_LIME, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
             <RefreshCw size={13} /> Sync now
           </button>
         </div>
@@ -1340,7 +1421,7 @@ const ReconciliationSection = ({ ministries, logActivity }) => {
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20, marginBottom: 18 }}>
         <div style={{ flex: 1 }}>
           <Pill tone="copper">⚡ April 2026 month-end</Pill>
-          <div style={{ fontFamily: fontDisplay, fontSize: 44, fontWeight: 600, color: COLORS.forest, letterSpacing: -1.2, marginTop: 14, lineHeight: 1.05 }}>
+          <div style={{ fontFamily: fontDisplay, fontSize: 44, fontWeight: 600, color: COLORS.forestText, letterSpacing: -1.2, marginTop: 14, lineHeight: 1.05 }}>
             {fmt(totalLeftover)} <span style={{ color: COLORS.ink, fontWeight: 500 }}>unused last month</span>
           </div>
           <div style={{ fontFamily: fontSerif, fontSize: 18, fontStyle: "italic", color: COLORS.inkSoft, marginTop: 10, lineHeight: 1.5, maxWidth: 600 }}>
@@ -1348,7 +1429,7 @@ const ReconciliationSection = ({ ministries, logActivity }) => {
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10, flexShrink: 0, alignSelf: "center" }}>
-          <button onClick={() => decideAll("roll")} style={{ padding: "12px 22px", backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+          <button onClick={() => decideAll("roll")} style={{ padding: "12px 22px", backgroundColor: COLORS.forest, color: ON_LIME, border: "none", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
             <ArrowUpRight size={14} /> Roll all forward to May
           </button>
           <button onClick={() => decideAll("return")} style={{ padding: "12px 22px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody, whiteSpace: "nowrap" }}>
@@ -1358,7 +1439,7 @@ const ReconciliationSection = ({ ministries, logActivity }) => {
       </div>
 
       <div style={{ padding: 12, backgroundColor: COLORS.cream, borderRadius: 9, marginBottom: 14, fontSize: 12, color: COLORS.ink, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <span><strong style={{ color: COLORS.forest }}>{decidedCount}</strong> of {eligible.length} decided</span>
+        <span><strong style={{ color: COLORS.forestText }}>{decidedCount}</strong> of {eligible.length} decided</span>
         <span style={{ color: COLORS.inkSoft }}>·</span>
         <span>rolled <strong style={{ color: COLORS.green }}>{fmt(rolled)}</strong></span>
         <span style={{ color: COLORS.inkSoft }}>·</span>
@@ -1606,7 +1687,7 @@ const RecommendationsSection = ({ ministries, updateMinistryBudget, logActivity 
             <Pill tone="success">✓ Applied to 2026</Pill>
           ) : c.suggestedBudget != null ? (
             <>
-              <button onClick={() => apply(c)} style={{ padding: "8px 14px", backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 7, fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>
+              <button onClick={() => apply(c)} style={{ padding: "8px 14px", backgroundColor: COLORS.forest, color: ON_LIME, border: "none", borderRadius: 7, fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>
                 Apply
               </button>
               <button onClick={() => dismiss(c.ministry.id)} style={{ padding: "8px 14px", backgroundColor: "transparent", color: COLORS.inkSoft, border: `1px solid ${COLORS.border}`, borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>
@@ -1656,7 +1737,7 @@ const RecommendationsSection = ({ ministries, updateMinistryBudget, logActivity 
           <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 600, color: COLORS.ink, marginTop: 2 }}>{groups["on-track"].length}</div>
           <div style={{ fontSize: 11, color: COLORS.green, fontWeight: 600 }}>well-managed</div>
         </div>
-        <button onClick={applyAll} style={{ marginLeft: "auto", padding: "12px 22px", backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6 }}>
+        <button onClick={applyAll} style={{ marginLeft: "auto", padding: "12px 22px", backgroundColor: COLORS.forest, color: ON_LIME, border: "none", borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6 }}>
           <Sparkles size={14} /> Apply all · save {fmt(netSavings)}/yr
         </button>
       </div>
@@ -1830,7 +1911,7 @@ const NotificationPreviewModal = ({ rec, onSendAndApply, onApplyWithoutNotify, o
           <button onClick={onApplyWithoutNotify} style={{ padding: "10px 18px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody }}>
             Apply without notifying
           </button>
-          <button onClick={onSendAndApply} style={{ padding: "10px 22px", backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 9, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6 }}>
+          <button onClick={onSendAndApply} style={{ padding: "10px 22px", backgroundColor: COLORS.forest, color: ON_LIME, border: "none", borderRadius: 9, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6 }}>
             <Mail size={14} /> Send & apply
           </button>
         </div>
@@ -1883,8 +1964,8 @@ const VarianceSection = ({ ministries }) => {
           <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>{utilizationPct.toFixed(1)}% of budget</div>
         </div>
         <div style={{ padding: 18, backgroundColor: "rgba(212,255,0,0.08)", borderRadius: 10, border: `1px solid ${COLORS.forest}40` }}>
-          <div style={{ fontSize: 11, color: COLORS.forest, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Unused funds</div>
-          <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 600, color: COLORS.forest, marginTop: 4, letterSpacing: -0.5 }}>{fmtShort(unused)}</div>
+          <div style={{ fontSize: 11, color: COLORS.forestText, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Unused funds</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 600, color: COLORS.forestText, marginTop: 4, letterSpacing: -0.5 }}>{fmtShort(unused)}</div>
           <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>available to redirect</div>
         </div>
         <div style={{ padding: 18, backgroundColor: COLORS.cream, borderRadius: 10 }}>
@@ -1965,7 +2046,7 @@ const QuarterlyReviewBanner = ({ ministries, updateMinistryBudget, logActivity, 
   if (state === "approved") {
     return (
       <Card style={{ padding: 22, backgroundColor: "rgba(74,222,128,0.06)", borderColor: COLORS.green + "40", display: "flex", alignItems: "center", gap: 16 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: COLORS.green, color: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: COLORS.green, color: ON_GREEN, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <Check size={20} strokeWidth={3} />
         </div>
         <div style={{ flex: 1 }}>
@@ -1984,7 +2065,7 @@ const QuarterlyReviewBanner = ({ ministries, updateMinistryBudget, logActivity, 
   if (state === "snoozed") {
     return (
       <Card style={{ padding: 22, backgroundColor: "rgba(251,191,36,0.06)", borderColor: COLORS.amber + "40", display: "flex", alignItems: "center", gap: 16 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: COLORS.amber, color: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: COLORS.amber, color: ON_AMBER, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <Clock size={18} strokeWidth={2.5} />
         </div>
         <div style={{ flex: 1 }}>
@@ -2016,7 +2097,7 @@ const QuarterlyReviewBanner = ({ ministries, updateMinistryBudget, logActivity, 
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0, alignSelf: "center" }}>
-          <button onClick={approveAllReductions} style={{ padding: "11px 20px", backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 9, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+          <button onClick={approveAllReductions} style={{ padding: "11px 20px", backgroundColor: COLORS.forest, color: ON_LIME, border: "none", borderRadius: 9, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
             <Check size={14} /> Approve all reductions
           </button>
           <button onClick={onScrollToRecs} style={{ padding: "11px 20px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody, whiteSpace: "nowrap" }}>
@@ -2337,7 +2418,7 @@ const BudgetPage = ({ ministries, updateMinistryBudget, logActivity, recurringPa
             return (
               <div key={sec.key} style={{ border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 18 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: COLORS.cream, color: COLORS.forest, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: COLORS.cream, color: COLORS.forestText, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <Icon size={16} />
                   </div>
                   <div style={{ flex: 1 }}>
@@ -2406,7 +2487,7 @@ const BudgetPage = ({ ministries, updateMinistryBudget, logActivity, recurringPa
             );
           })}
         </div>
-        <div style={{ marginTop: 14, padding: 14, backgroundColor: COLORS.forestDeep, color: COLORS.ink, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ marginTop: 14, padding: 14, backgroundColor: COLORS.forestDeep, color: INVERSE_INK, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <TrendingDown size={16} color={COLORS.copper} />
             <div style={{ fontSize: 13 }}>vs. 2025 actual ({fmt(TOTAL_EXPENSES)}) — projecting</div>
@@ -2483,7 +2564,7 @@ const BudgetPage = ({ ministries, updateMinistryBudget, logActivity, recurringPa
             );
           })}
         </div>
-        <div style={{ marginTop: 16, padding: 18, backgroundColor: COLORS.forestDeep, color: COLORS.ink, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ marginTop: 16, padding: 18, backgroundColor: COLORS.forestDeep, color: INVERSE_INK, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <AlertTriangle size={20} color={COLORS.copper} />
             <div>
@@ -2846,7 +2927,7 @@ const CalendarPage = ({ recurringPayments, savePayment, deletePayment }) => {
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
                     <span style={{
                       fontFamily: fontDisplay, fontSize: 14, fontWeight: 700,
-                      color: today ? COLORS.copper : sel ? COLORS.forest : COLORS.ink,
+                      color: today ? COLORS.copper : COLORS.ink,
                       width: 22, height: 22, borderRadius: 99,
                       display: "flex", alignItems: "center", justifyContent: "center",
                       backgroundColor: today ? COLORS.copper + "20" : "transparent",
@@ -2932,7 +3013,7 @@ const CalendarPage = ({ recurringPayments, savePayment, deletePayment }) => {
                 </div>
                 <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                   <span style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Day total</span>
-                  <span style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 600, color: COLORS.forest }}>{fmt(selectedDayTotal)}</span>
+                  <span style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 600, color: COLORS.forestText }}>{fmt(selectedDayTotal)}</span>
                 </div>
               </>
             )}
@@ -2946,7 +3027,7 @@ const CalendarPage = ({ recurringPayments, savePayment, deletePayment }) => {
                 <div style={{ fontSize: 11, color: COLORS.inkSoft }}>Click any to edit · auto-rolls every month</div>
               </div>
               <button onClick={() => setEditing("new")} style={{
-                width: 32, height: 32, borderRadius: 8, backgroundColor: COLORS.forest, color: COLORS.bg,
+                width: 32, height: 32, borderRadius: 8, backgroundColor: COLORS.forest, color: ON_LIME,
                 border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
               }}>
                 <Plus size={15} strokeWidth={2.5} />
@@ -3040,7 +3121,7 @@ const MinistriesPage = ({ openReceiptModal, ministries, addMinistry }) => {
         {!adding && (
           <button onClick={() => setAdding(true)} style={{
             display: "flex", alignItems: "center", gap: 6, backgroundColor: COLORS.forest,
-            color: COLORS.bg, border: "none", padding: "10px 18px", borderRadius: 9,
+            color: ON_LIME, border: "none", padding: "10px 18px", borderRadius: 9,
             fontSize: 13, fontFamily: fontBody, fontWeight: 700, cursor: "pointer",
           }}>
             <Plus size={14} /> New ministry
@@ -3055,7 +3136,7 @@ const MinistriesPage = ({ openReceiptModal, ministries, addMinistry }) => {
           display: "flex", alignItems: "center", gap: 12,
         }}>
           <div style={{
-            width: 28, height: 28, borderRadius: 7, backgroundColor: COLORS.forest, color: COLORS.bg,
+            width: 28, height: 28, borderRadius: 7, backgroundColor: COLORS.forest, color: ON_LIME,
             display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
           }}>
             <Check size={14} strokeWidth={3} />
@@ -3063,7 +3144,7 @@ const MinistriesPage = ({ openReceiptModal, ministries, addMinistry }) => {
           <div style={{ flex: 1, fontSize: 13, color: COLORS.ink }}>
             <strong>{recent.name}</strong> added — currently unassigned.{" "}
             <span style={{ color: COLORS.inkSoft }}>
-              Go to <strong style={{ color: COLORS.forest }}>Administrators</strong> to assign it to a leader.
+              Go to <strong style={{ color: COLORS.forestText }}>Administrators</strong> to assign it to a leader.
             </span>
           </div>
           <button onClick={() => setRecent(null)} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: COLORS.inkSoft }}>
@@ -3080,7 +3161,7 @@ const MinistriesPage = ({ openReceiptModal, ministries, addMinistry }) => {
         }}>
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, backgroundColor: COLORS.forest }} />
           <div style={{ marginBottom: 16, marginTop: 4 }}>
-            <div style={{ fontSize: 11, color: COLORS.forest, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>
+            <div style={{ fontSize: 11, color: COLORS.forestText, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>
               New ministry
             </div>
             <div style={{ fontFamily: fontSerif, fontSize: 18, fontStyle: "italic", color: COLORS.inkSoft, marginTop: 4 }}>
@@ -3229,49 +3310,167 @@ const MinistriesPage = ({ openReceiptModal, ministries, addMinistry }) => {
 // CAMPUSES PAGE
 // ============================================================
 
-const CampusesPage = () => {
-  const campuses = [
-    { name: "Main · Everett", isMain: true, donations: 1814440, expenses: 1606278, members: 1240, ministries: 14, address: "Everett, WA" },
-    { name: "Tacoma", isMain: false, donations: 24262.53, expenses: 30005.99, members: 180, ministries: 4, address: "Tacoma, WA" },
-    { name: "New York", isMain: false, donations: 44000.00, expenses: 21486.89, members: 95, ministries: 3, address: "New York, NY" },
-  ];
+const CampusesPage = ({ campuses, addCampus, setActiveCampus }) => {
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
+  const [recent, setRecent] = useState(null);
+
+  const canSubmit = name.trim().length > 0 && address.trim().length > 0;
+
+  const submit = () => {
+    if (!canSubmit) return;
+    addCampus({ name: name.trim(), address: address.trim() });
+    setRecent(name.trim());
+    setName(""); setAddress(""); setAdding(false);
+  };
+  const cancel = () => { setName(""); setAddress(""); setAdding(false); };
+
+  const totalDonations = campuses.reduce((s, c) => s + c.donations, 0);
+  const totalExpenses = campuses.reduce((s, c) => s + c.expenses, 0);
+
   return (
     <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* HEADER */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 24, fontWeight: 600, color: COLORS.ink, letterSpacing: -0.5 }}>
+            All campuses
+          </div>
+          <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 2 }}>
+            {campuses.length} active · {fmtShort(totalDonations)} total donations · {fmtShort(totalExpenses)} total expenses
+          </div>
+        </div>
+        {!adding && (
+          <button onClick={() => setAdding(true)} style={{
+            display: "flex", alignItems: "center", gap: 6,
+            backgroundColor: COLORS.forest, color: ON_LIME, border: "none",
+            padding: "10px 18px", borderRadius: 9, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody,
+          }}>
+            <Plus size={14} /> New campus
+          </button>
+        )}
+      </div>
+
+      {/* RECENT-ADDED FLASH */}
+      {recent && (
+        <Card style={{ padding: 14, backgroundColor: "rgba(212,255,0,0.06)", borderColor: COLORS.forest + "60", display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 7, backgroundColor: COLORS.forest, color: ON_LIME, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Check size={14} strokeWidth={3} />
+          </div>
+          <div style={{ flex: 1, fontSize: 13, color: COLORS.ink }}>
+            <strong>{recent}</strong> added — appears in <strong>TopBar</strong> dropdown, <strong>Integrations</strong> routing map, and is ready to assign admins/ministries to.
+          </div>
+          <button onClick={() => setRecent(null)} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: COLORS.inkSoft }}>
+            <X size={16} />
+          </button>
+        </Card>
+      )}
+
+      {/* INLINE NEW-CAMPUS FORM */}
+      {adding && (
+        <Card style={{ padding: 22, position: "relative", overflow: "hidden", borderColor: COLORS.forest + "60" }}>
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, backgroundColor: COLORS.forest }} />
+          <div style={{ marginBottom: 14, marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: COLORS.forestText, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>New campus</div>
+            <div style={{ fontFamily: fontSerif, fontSize: 18, fontStyle: "italic", color: COLORS.inkSoft, marginTop: 4 }}>
+              Spin up the structure — donations, expenses, ministries, admins all start at zero.
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600, marginBottom: 4 }}>Campus name *</div>
+              <input
+                autoFocus value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && canSubmit) submit(); if (e.key === "Escape") cancel(); }}
+                placeholder="e.g. Spokane"
+                style={{ width: "100%", padding: "10px 12px", fontSize: 14, fontWeight: 600, fontFamily: fontBody, color: COLORS.ink, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box" }}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600, marginBottom: 4 }}>Address *</div>
+              <input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && canSubmit) submit(); if (e.key === "Escape") cancel(); }}
+                placeholder="e.g. Spokane, WA"
+                style={{ width: "100%", padding: "10px 12px", fontSize: 14, fontWeight: 600, fontFamily: fontBody, color: COLORS.ink, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box" }}
+              />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button onClick={submit} disabled={!canSubmit} style={{
+              padding: "10px 18px", border: "none", borderRadius: 9, fontFamily: fontBody, fontWeight: 700, fontSize: 13,
+              cursor: canSubmit ? "pointer" : "not-allowed",
+              backgroundColor: canSubmit ? COLORS.forest : COLORS.cream,
+              color: canSubmit ? COLORS.bg : COLORS.inkSoft,
+              display: "flex", alignItems: "center", gap: 6,
+            }}>
+              <Plus size={14} /> Add campus
+            </button>
+            <button onClick={cancel} style={{ padding: "10px 16px", border: `1px solid ${COLORS.border}`, borderRadius: 9, fontFamily: fontBody, fontWeight: 600, fontSize: 13, cursor: "pointer", backgroundColor: "transparent", color: COLORS.ink }}>
+              Cancel
+            </button>
+            <span style={{ fontSize: 11, color: COLORS.inkSoft, marginLeft: 8 }}>Press Enter to add · Esc to cancel</span>
+          </div>
+        </Card>
+      )}
+
+      {/* CAMPUS CARDS */}
       {campuses.map((c, i) => {
         const surplus = c.donations - c.expenses;
         return (
-          <Card key={i} style={{ padding: 28, position: "relative", overflow: "hidden" }}>
-            {c.isMain && (
+          <Card key={c.id || i} style={{ padding: 24, position: "relative", overflow: "hidden" }}>
+            {c.isHQ && (
               <div style={{ position: "absolute", top: 16, right: 16 }}>
-                <Pill tone="forest">★ Primary</Pill>
+                <Pill tone="forest">★ HQ</Pill>
               </div>
             )}
-            <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr", gap: 24, alignItems: "center" }}>
+            <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 4, backgroundColor: c.color }} />
+            <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr 1fr 160px", gap: 20, alignItems: "center" }}>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                  <Church size={22} color={COLORS.forest} strokeWidth={1.6} />
-                  <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 500, color: COLORS.ink, letterSpacing: -0.5 }}>{c.name}</div>
+                  <div style={{ width: 36, height: 36, borderRadius: 9, backgroundColor: c.color, color: textOnBg(c.color), display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fontDisplay, fontWeight: 700, fontSize: 16 }}>
+                    {c.short}
+                  </div>
+                  <div style={{ fontFamily: fontDisplay, fontSize: 26, fontWeight: 500, color: COLORS.ink, letterSpacing: -0.5 }}>{c.name}</div>
                 </div>
                 <div style={{ fontSize: 13, color: COLORS.inkSoft }}>{c.address}</div>
               </div>
               <div>
                 <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Donations</div>
-                <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 500, color: COLORS.ink, marginTop: 2 }}>{fmtShort(c.donations)}</div>
+                <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 500, color: COLORS.ink, marginTop: 2 }}>{fmtShort(c.donations)}</div>
               </div>
               <div>
-                <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Expenses</div>
-                <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 500, color: COLORS.ink, marginTop: 2 }}>{fmtShort(c.expenses)}</div>
+                <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Annual overhead</div>
+                <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 500, color: COLORS.ink, marginTop: 2 }}>{fmtShort(c.annualOverhead || 0)}</div>
+                <div style={{ fontSize: 10, color: COLORS.inkSoft, marginTop: 2 }}>{c.paymentCount || 0} payments</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Ministry budget</div>
+                <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 500, color: COLORS.ink, marginTop: 2 }}>{fmtShort(c.ministryBudget || 0)}</div>
+                <div style={{ fontSize: 10, color: COLORS.inkSoft, marginTop: 2 }}>{c.ministryCount || 0} ministries</div>
               </div>
               <div>
                 <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Net</div>
-                <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 500, color: surplus >= 0 ? COLORS.green : COLORS.red, marginTop: 2 }}>
+                <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 500, color: surplus >= 0 ? COLORS.green : COLORS.red, marginTop: 2 }}>
                   {surplus >= 0 ? "+" : ""}{fmtShort(surplus)}
                 </div>
+                <div style={{ fontSize: 10, color: COLORS.inkSoft, marginTop: 2 }}>{c.members} members</div>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
-                <Pill tone="copper">{c.members} members</Pill>
-                <Pill tone="neutral">{c.ministries} ministries</Pill>
-              </div>
+              <button
+                onClick={() => setActiveCampus(c.id)}
+                style={{
+                  padding: "10px 14px", borderRadius: 9, border: "none",
+                  backgroundColor: c.color, color: textOnBg(c.color),
+                  fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: fontBody,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                }}
+              >
+                Work on {c.name} →
+              </button>
             </div>
           </Card>
         );
@@ -3340,7 +3539,7 @@ const AssignmentModal = ({ admin, assignments, ministries, renameMinistry, updat
 
         <div style={{ padding: "24px 28px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ width: 44, height: 44, borderRadius: "50%", backgroundColor: COLORS.forest, color: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>{admin.avatar}</div>
+            <div style={{ width: 44, height: 44, borderRadius: "50%", backgroundColor: COLORS.forest, color: ON_LIME, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>{admin.avatar}</div>
             <div>
               <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 500, color: COLORS.ink, fontStyle: "italic", letterSpacing: -0.3 }}>Assign ministries to {admin.name}</div>
               <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>Click any ministry to toggle. Selecting one already assigned transfers it.</div>
@@ -3492,7 +3691,7 @@ const AssignmentModal = ({ admin, assignments, ministries, renameMinistry, updat
             <button onClick={onClose} style={{ padding: "10px 18px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody }}>
               Cancel
             </button>
-            <button onClick={() => { onSave(selected); onClose(); }} style={{ padding: "10px 20px", backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 9, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6 }}>
+            <button onClick={() => { onSave(selected); onClose(); }} style={{ padding: "10px 20px", backgroundColor: COLORS.forest, color: ON_LIME, border: "none", borderRadius: 9, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 6 }}>
               <Check size={14} /> Save assignments
             </button>
           </div>
@@ -3615,7 +3814,7 @@ const AdministratorsPage = ({
             </button>
           ))}
         </div>
-        <button onClick={addAdmin} style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: COLORS.bg, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
+        <button onClick={addAdmin} style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: ON_LIME, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
           <UserPlus size={14} /> Add administrator
         </button>
       </div>
@@ -3768,7 +3967,7 @@ const EventsPage = () => {
             <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 500, color: COLORS.ink, fontStyle: "italic" }}>All events & camps</div>
             <div style={{ fontSize: 12, color: COLORS.inkSoft }}>Track registration, attendance, and budgets</div>
           </div>
-          <button style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: COLORS.bg, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
+          <button style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: ON_LIME, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
             <Plus size={14} /> New event
           </button>
         </div>
@@ -3807,7 +4006,7 @@ const ReceiptsPage = ({ openReceiptModal }) => {
   return (
     <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 20 }}>
       <Card style={{
-        padding: 32, backgroundColor: COLORS.forestDeep, color: COLORS.ink, border: "none",
+        padding: 32, backgroundColor: COLORS.forestDeep, color: INVERSE_INK, border: "none",
         backgroundImage: `radial-gradient(circle at 80% 20%, rgba(184,133,94,0.15) 0%, transparent 50%)`
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -4088,7 +4287,7 @@ const PeoplePage = () => {
             <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 500, color: COLORS.ink, fontStyle: "italic" }}>Team & access</div>
             <div style={{ fontSize: 12, color: COLORS.inkSoft }}>{TEAM.length} active members · invite ministry leaders with limited access</div>
           </div>
-          <button style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: COLORS.bg, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
+          <button style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: ON_LIME, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
             <UserPlus size={14} /> Invite member
           </button>
         </div>
@@ -4099,7 +4298,7 @@ const PeoplePage = () => {
         {TEAM.map((p, i) => (
           <div key={i} style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr 80px", gap: 12, padding: 14, borderBottom: `1px solid ${COLORS.borderSoft}`, alignItems: "center" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 38, height: 38, borderRadius: "50%", backgroundColor: COLORS.forest, color: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13 }}>{p.avatar}</div>
+              <div style={{ width: 38, height: 38, borderRadius: "50%", backgroundColor: COLORS.forest, color: ON_LIME, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13 }}>{p.avatar}</div>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{p.name}</div>
                 <div style={{ fontSize: 11, color: COLORS.inkSoft }}>{p.email}</div>
@@ -4168,13 +4367,6 @@ const PeoplePage = () => {
 // ============================================================
 // INTEGRATIONS PAGE
 // ============================================================
-
-// Campuses available for donation routing.
-const INTEGRATION_CAMPUSES = [
-  { id: "main", name: "Main", subtitle: "Everett, WA", isHQ: true,  short: "E", color: "#D4FF00" },
-  { id: "tacoma", name: "Tacoma", subtitle: "Tacoma, WA", isHQ: false, short: "T", color: "#FF3B8A" },
-  { id: "ny", name: "New York", subtitle: "New York, NY", isHQ: false, short: "N", color: "#A78BFA" },
-];
 
 const INTEGRATIONS = [
   {
@@ -4247,11 +4439,11 @@ const INTEGRATIONS = [
 // Pre-populate to match IRC's actual setup: Stripe org-wide, Square Main only, QuickBooks org-wide.
 const INITIAL_CONNECTIONS = [
   { id: "conn-stripe-all",  integrationName: "Stripe", scope: "all", credentials: { secretKey: "sk_live_•••" }, connectedAt: Date.now() - 90 * 24 * 60 * 60 * 1000, lastSync: Date.now() - 2 * 60 * 1000 },
-  { id: "conn-square-main", integrationName: "Square", scope: "main", credentials: { accessToken: "EAAAEx•••", locationId: "L8X09F•••" }, connectedAt: Date.now() - 60 * 24 * 60 * 60 * 1000, lastSync: Date.now() - 8 * 60 * 1000 },
+  { id: "conn-square-bellevue", integrationName: "Square", scope: "bellevue", credentials: { accessToken: "EAAAEx•••", locationId: "L8X09F•••" }, connectedAt: Date.now() - 60 * 24 * 60 * 60 * 1000, lastSync: Date.now() - 8 * 60 * 1000 },
   { id: "conn-qb-all",      integrationName: "QuickBooks Online", scope: "all", credentials: { companyId: "1234567890", clientId: "AB•••", clientSecret: "•••" }, connectedAt: Date.now() - 90 * 24 * 60 * 60 * 1000, lastSync: Date.now() - 60 * 60 * 1000 },
 ];
 
-const ConnectionModal = ({ integration, existing, defaultScope, onConnect, onClose }) => {
+const ConnectionModal = ({ integration, existing, defaultScope, campuses, onConnect, onClose }) => {
   const [values, setValues] = useState(existing || {});
   const [reveal, setReveal] = useState({});
   const [scopeMode, setScopeMode] = useState(defaultScope || "all"); // 'all' | 'campus'
@@ -4276,7 +4468,7 @@ const ConnectionModal = ({ integration, existing, defaultScope, onConnect, onClo
     if (!supportsCampusScope) return "Connect";
     if (scopeMode === "all") return "Connect for all campuses";
     if (!scopeCampus) return "Choose a campus";
-    const c = INTEGRATION_CAMPUSES.find((c) => c.id === scopeCampus);
+    const c = campuses?.find((c) => c.id === scopeCampus);
     return `Connect for ${c?.name || ""}`;
   })();
 
@@ -4352,8 +4544,8 @@ const ConnectionModal = ({ integration, existing, defaultScope, onConnect, onClo
                 {scopeMode === "campus" && (
                   <div>
                     <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, marginBottom: 8 }}>Pick a campus</div>
-                    <div style={{ display: "grid", gridTemplateColumns: `repeat(${INTEGRATION_CAMPUSES.length}, 1fr)`, gap: 8 }}>
-                      {INTEGRATION_CAMPUSES.map((c) => {
+                    <div style={{ display: "grid", gridTemplateColumns: `repeat(${campuses.length}, 1fr)`, gap: 8 }}>
+                      {campuses.map((c) => {
                         const sel = scopeCampus === c.id;
                         return (
                           <button
@@ -4365,7 +4557,7 @@ const ConnectionModal = ({ integration, existing, defaultScope, onConnect, onClo
                               border: `2px solid ${sel ? c.color : COLORS.border}`,
                             }}
                           >
-                            <div style={{ width: 32, height: 32, borderRadius: 8, margin: "0 auto 6px", backgroundColor: c.color, color: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fontDisplay, fontWeight: 700, fontSize: 14 }}>
+                            <div style={{ width: 32, height: 32, borderRadius: 8, margin: "0 auto 6px", backgroundColor: c.color, color: textOnBg(c.color), display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fontDisplay, fontWeight: 700, fontSize: 14 }}>
                               {c.short}
                             </div>
                             <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.ink }}>{c.name}</div>
@@ -4479,7 +4671,7 @@ const ConnectionModal = ({ integration, existing, defaultScope, onConnect, onClo
   );
 };
 
-const IntegrationsPage = () => {
+const IntegrationsPage = ({ campuses }) => {
   // Connections is an array — multiple instances per integration allowed
   // for donation providers (one per campus). Non-donation integrations
   // get one entry with scope='all'.
@@ -4562,13 +4754,13 @@ const IntegrationsPage = () => {
           </div>
           <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 4 }}>Where each campus's giving lands. Shared providers route to all four.</div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${INTEGRATION_CAMPUSES.length}, 1fr)`, gap: 12 }}>
-          {INTEGRATION_CAMPUSES.map((c) => {
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${campuses.length}, 1fr)`, gap: 12 }}>
+          {campuses.map((c) => {
             const conns = donationConnsForCampus(c.id);
             return (
               <div key={c.id} style={{ padding: 16, borderRadius: 10, border: `1px solid ${COLORS.border}`, borderLeft: `4px solid ${c.color}`, backgroundColor: COLORS.bg }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: c.color, color: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fontDisplay, fontWeight: 700, fontSize: 14 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: c.color, color: textOnBg(c.color), display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fontDisplay, fontWeight: 700, fontSize: 14 }}>
                     {c.short}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -4581,7 +4773,7 @@ const IntegrationsPage = () => {
                 </div>
                 {conns.length === 0 ? (
                   <div style={{ fontSize: 11, color: COLORS.inkSoft, fontStyle: "italic" }}>
-                    No donation providers · inheriting from {INTEGRATION_CAMPUSES.find((cc) => cc.isHQ)?.name}
+                    No donation providers · inheriting from {campuses.find((cc) => cc.isHQ)?.name}
                   </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -4641,7 +4833,7 @@ const IntegrationsPage = () => {
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
                   {conns.map((conn) => {
                     const isAll = conn.scope === "all";
-                    const campus = isAll ? null : INTEGRATION_CAMPUSES.find((c) => c.id === conn.scope);
+                    const campus = isAll ? null : campuses.find((c) => c.id === conn.scope);
                     const chipColor = isAll ? COLORS.forest : (campus?.color || COLORS.inkSoft);
                     return (
                       <div key={conn.id} style={{ padding: 12, borderRadius: 9, backgroundColor: COLORS.bg, border: `1px solid ${COLORS.borderSoft}` }}>
@@ -4659,7 +4851,7 @@ const IntegrationsPage = () => {
                           </div>
                         </div>
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          <button onClick={() => sync(conn)} style={{ flex: 1, minWidth: 100, padding: "7px 12px", backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 7, fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                          <button onClick={() => sync(conn)} style={{ flex: 1, minWidth: 100, padding: "7px 12px", backgroundColor: COLORS.forest, color: ON_LIME, border: "none", borderRadius: 7, fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
                             <RefreshCw size={11} /> Sync now
                           </button>
                           <button onClick={() => setEditing({ integration: int, connection: conn, mode: "edit" })} style={{ padding: "7px 12px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 7, fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: fontBody }}>
@@ -4712,6 +4904,7 @@ const IntegrationsPage = () => {
           integration={editing.integration}
           existing={editing.connection?.credentials}
           defaultScope={editing.mode === "add-campus" ? "campus" : "all"}
+          campuses={campuses}
           onConnect={connect}
           onClose={() => setEditing(null)}
         />
@@ -4721,80 +4914,715 @@ const IntegrationsPage = () => {
 };
 
 // ============================================================
-// REPORTS PAGE
+// SETTINGS PAGE — theme toggle + other prefs
 // ============================================================
 
-const ReportsPage = () => {
-  const reports = [
-    { name: "Annual Financial Statement", desc: "Year-end summary matching your 2025 PDF format", icon: FileText, color: COLORS.forest },
-    { name: "Donor Year-End Letters", desc: "Tax-deductible giving statements for all donors", icon: Mail, color: COLORS.copper },
-    { name: "Ministry Budget vs. Actual", desc: "Per-ministry spending against budget, drillable", icon: BarChart3, color: COLORS.green },
-    { name: "Campus Comparison", desc: "Side-by-side: Main · Tacoma · NY", icon: Building2, color: COLORS.amber },
-    { name: "Camp & Retreat P&L", desc: "Registration revenue vs. event expenses", icon: Calendar, color: "#52796F" },
-    { name: "Board Pack (PDF)", desc: "One-click monthly board meeting deck", icon: FileText, color: COLORS.ink },
+// Mini-mockup preview that renders with a SPECIFIC theme regardless of the
+// active one. Uses the theme's raw hex values so both previews always show
+// their correct look.
+const ThemeMockup = ({ palette }) => (
+  <div style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${palette.border}`, backgroundColor: palette.bg }}>
+    {/* Browser chrome */}
+    <div style={{ padding: "8px 10px", display: "flex", alignItems: "center", gap: 6, borderBottom: `1px solid ${palette.border}` }}>
+      <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: "#FF5F57" }} />
+      <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: "#FEBC2E" }} />
+      <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: "#28C840" }} />
+    </div>
+    <div style={{ display: "flex", minHeight: 180 }}>
+      {/* Always-dark sidebar */}
+      <div style={{ width: 60, backgroundColor: "#000", padding: "10px 6px", display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ width: 18, height: 18, borderRadius: 4, backgroundColor: palette.copper }} />
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} style={{ width: "100%", height: 8, borderRadius: 2, backgroundColor: i === 1 ? palette.copper : "rgba(255,255,255,0.15)" }} />
+        ))}
+      </div>
+      <div style={{ flex: 1, padding: 12 }}>
+        <div style={{ height: 14, width: "60%", backgroundColor: palette.ink, borderRadius: 3, marginBottom: 10, opacity: 0.8 }} />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
+          {[palette.ink, palette.copper, palette.forest].map((c, i) => (
+            <div key={i} style={{ padding: 8, backgroundColor: palette.surface, border: `1px solid ${palette.border}`, borderRadius: 6 }}>
+              <div style={{ height: 6, width: "55%", backgroundColor: palette.inkSoft, borderRadius: 2, marginBottom: 5, opacity: 0.6 }} />
+              <div style={{ height: 10, width: "70%", backgroundColor: c, borderRadius: 2 }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ padding: 8, backgroundColor: palette.surface, border: `1px solid ${palette.border}`, borderRadius: 6 }}>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 32 }}>
+            {[55, 50, 62, 70, 64, 58, 55, 60, 67, 70, 65, 95].map((h, i) => (
+              <div key={i} style={{ flex: 1, height: `${h}%`, backgroundColor: palette.forest, borderRadius: 1, opacity: 0.85 }} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const SettingsPage = ({ themeMode, setThemeMode, onSignOut }) => {
+  const rows = [
+    { icon: BellRing, label: "Notifications",   value: "Email + push",                onClick: () => {} },
+    { icon: Globe,     label: "Time zone",       value: "Pacific (PT)",                onClick: () => {} },
+    { icon: CreditCard,label: "Billing",         value: "Growth · $199/mo",            onClick: () => {} },
+    { icon: Shield,    label: "Two-factor auth", value: "Enabled",                     active: true,    onClick: () => {} },
+    { icon: Mail,      label: "Receipt forwarding", value: "receipts@steward.app",     onClick: () => {} },
   ];
 
   return (
-    <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 20 }}>
+    <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 20, maxWidth: 1100 }}>
+
+      {/* APPEARANCE */}
       <Card style={{ padding: 24 }}>
-        <div style={{ marginBottom: 18 }}>
-          <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 500, color: COLORS.ink, fontStyle: "italic", letterSpacing: -0.5 }}>Generate a report</div>
-          <div style={{ fontSize: 13, color: COLORS.inkSoft }}>One click. PDF, Excel, or Google Sheets — your choice.</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Appearance</div>
+            <div style={{ fontFamily: fontSerif, fontSize: 24, fontStyle: "italic", color: COLORS.ink, marginTop: 6, letterSpacing: -0.4 }}>
+              Pick the look that fits your day.
+            </div>
+            <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 6, lineHeight: 1.55, maxWidth: 540 }}>
+              Lime accents and copper highlights stay consistent in both modes — that's the brand. The sidebar stays dark either way to keep your visual anchor.
+            </div>
+          </div>
+          {/* Quick toggle pill */}
+          <div style={{ padding: 4, borderRadius: 99, backgroundColor: COLORS.cream, border: `1px solid ${COLORS.border}`, display: "inline-flex", flexShrink: 0 }}>
+            <button onClick={() => setThemeMode("dark")} style={{
+              padding: "8px 14px", borderRadius: 99, border: "none", cursor: "pointer", fontFamily: fontBody, fontWeight: 700, fontSize: 12,
+              backgroundColor: themeMode === "dark" ? "#000" : "transparent",
+              color: themeMode === "dark" ? "#FAFAFA" : COLORS.ink,
+              display: "flex", alignItems: "center", gap: 6,
+            }}>
+              <Flame size={12} /> Dark
+            </button>
+            <button onClick={() => setThemeMode("light")} style={{
+              padding: "8px 14px", borderRadius: 99, border: "none", cursor: "pointer", fontFamily: fontBody, fontWeight: 700, fontSize: 12,
+              backgroundColor: themeMode === "light" ? COLORS.forest : "transparent",
+              color: themeMode === "light" ? ON_LIME : COLORS.ink,
+              display: "flex", alignItems: "center", gap: 6,
+            }}>
+              <Sparkles size={12} /> Light
+            </button>
+          </div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
-          {reports.map((r, i) => {
-            const Icon = r.icon;
+
+        {/* Two big preview cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 20 }}>
+          {[
+            { mode: "dark",  palette: THEME_DARK,  label: "Dark",  desc: "Default. Easy on the eyes for long sessions." },
+            { mode: "light", palette: THEME_LIGHT, label: "Light", desc: "Cream canvas. Matches the marketing site." },
+          ].map((t) => {
+            const active = themeMode === t.mode;
             return (
-              <div key={i} style={{
-                padding: 18, border: `1px solid ${COLORS.border}`, borderRadius: 12,
-                cursor: "pointer", transition: "all 0.15s", display: "flex", flexDirection: "column", gap: 10,
-              }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = r.color; e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(31,58,52,0.08)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = COLORS.border; e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: r.color + "15", color: r.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Icon size={18} />
+              <button
+                key={t.mode}
+                onClick={() => setThemeMode(t.mode)}
+                style={{
+                  padding: 14, borderRadius: 14, fontFamily: fontBody, cursor: "pointer", textAlign: "left",
+                  backgroundColor: active ? "rgba(212,255,0,0.04)" : COLORS.surface,
+                  border: `2px solid ${active ? COLORS.forest : COLORS.border}`,
+                  boxShadow: active ? `0 12px 36px ${COLORS.forest}25` : "none",
+                  transition: "all 0.18s",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 700, color: COLORS.ink }}>{t.label}</div>
+                    <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>{t.desc}</div>
+                  </div>
+                  {active && <Pill tone="forest">Active</Pill>}
                 </div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink, marginBottom: 4 }}>{r.name}</div>
-                  <div style={{ fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.5 }}>{r.desc}</div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: r.color, fontWeight: 600, marginTop: 4 }}>
-                  Generate <ChevronRight size={12} />
-                </div>
-              </div>
+                <ThemeMockup palette={t.palette} />
+              </button>
             );
           })}
         </div>
       </Card>
 
-      <Card style={{ padding: 24 }}>
-        <div style={{ marginBottom: 18 }}>
-          <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 500, color: COLORS.ink, fontStyle: "italic" }}>Recent exports</div>
+      {/* OTHER SETTINGS */}
+      <Card style={{ padding: 0, overflow: "hidden" }}>
+        {rows.map((row, i) => {
+          const Icon = row.icon;
+          return (
+            <button
+              key={i}
+              onClick={row.onClick}
+              style={{
+                width: "100%", padding: "16px 20px", display: "flex", alignItems: "center", gap: 14,
+                backgroundColor: "transparent", border: "none", cursor: "pointer", fontFamily: fontBody, textAlign: "left",
+                borderBottom: i < rows.length - 1 ? `1px solid ${COLORS.borderSoft}` : "none",
+              }}
+            >
+              <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: COLORS.cream, color: COLORS.copper, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Icon size={15} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{row.label}</div>
+              </div>
+              <div style={{ fontSize: 12, color: row.active ? COLORS.green : COLORS.copper, fontWeight: 600 }}>
+                {row.value}
+              </div>
+              <ChevronRight size={14} color={COLORS.inkSoft} />
+            </button>
+          );
+        })}
+      </Card>
+
+      {/* SIGN OUT */}
+      <Card style={{ padding: 18, borderColor: COLORS.red + "40", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>Sign out</div>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>You'll need to sign in again to access this admin.</div>
+        </div>
+        <button onClick={onSignOut} style={{
+          padding: "10px 18px", border: `1px solid ${COLORS.red}80`, borderRadius: 9,
+          backgroundColor: "transparent", color: COLORS.red, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody,
+        }}>
+          Sign out
+        </button>
+      </Card>
+
+    </div>
+  );
+};
+
+// ============================================================
+// REPORTS PAGE
+// ============================================================
+
+const REPORT_DEFINITIONS = [
+  { id: "annual",   name: "Annual Financial Statement", desc: "Full P&L, cash flow, balance sheet — board-ready",                      icon: FileText, color: COLORS.forest, formats: ["PDF", "Excel"],          lastRun: "Dec 31, 2025", badge: null },
+  { id: "donor",    name: "Donor Year-End Letters",     desc: "Auto-merged from Stripe, Square, and manual entries",                  icon: Mail,     color: COLORS.copper, formats: ["PDF", "Mail-merge"],     lastRun: "Dec 10, 2025", badge: { label: "387 ready to send", tone: "success" } },
+  { id: "ministry", name: "Ministry Budget vs. Actual", desc: "Per-ministry variance highlighted, drill into any line item",          icon: BarChart3, color: COLORS.green,  formats: ["PDF", "Excel", "Sheets"], lastRun: "Apr 30, 2026", badge: null },
+  { id: "campus",   name: "Campus Comparison",          desc: "Side-by-side P&L and KPIs across every campus",                        icon: Building2, color: "#A78BFA",     formats: ["PDF", "Sheets"],         lastRun: "Apr 15, 2026", badge: null },
+  { id: "board",    name: "Board Pack",                 desc: "Full board deck — KPIs, alerts, decisions awaiting sign-off",          icon: FileText, color: COLORS.red,    formats: ["PDF", "PowerPoint"],     lastRun: "May 1, 2026",  badge: { label: "Auto · 1st of month", tone: "copper" } },
+  { id: "990",      name: "IRS Form 990 Worksheet",     desc: "Pre-filled rows mapped from QuickBooks classes and accounts",         icon: Shield,   color: COLORS.amber,  formats: ["PDF", "Excel"],          lastRun: "—",           badge: null },
+];
+
+const PERIOD_OPTIONS = [
+  { id: "ytd",    label: "Year to date" },
+  { id: "q1",     label: "Q1 2026" },
+  { id: "fy2025", label: "FY 2025" },
+  { id: "custom", label: "Custom" },
+];
+
+// Trigger a real file download in the browser.
+const downloadFile = (filename, content, mime = "text/csv;charset=utf-8") => {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+// Open a styled print-ready window. User saves as PDF via the browser's print dialog.
+const openPrintWindow = (title, bodyHtml) => {
+  const win = window.open("", "_blank", "width=900,height=800");
+  if (!win) { alert("Popup blocked. Allow popups to print PDF reports."); return; }
+  win.document.write(`<!doctype html><html><head><title>${title}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700&family=Manrope:wght@400;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+    <style>
+      body { font-family: 'Manrope', sans-serif; padding: 50px 40px; max-width: 820px; margin: 0 auto; color: #0A0A0A; }
+      .brand { display: flex; align-items: center; gap: 10px; padding-bottom: 20px; border-bottom: 1px solid #ccc; margin-bottom: 30px; }
+      .brand-mark { width: 32px; height: 32px; border-radius: 8px; background: #D4FF00; color: #000; display: flex; align-items: center; justify-content: center; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 18px; }
+      .brand-name { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 18px; }
+      h1 { font-family: 'Bricolage Grotesque', sans-serif; font-size: 36px; font-weight: 600; letter-spacing: -1px; margin: 0 0 4px; line-height: 1.1; }
+      h1 em { font-family: 'Instrument Serif', serif; font-weight: 400; color: #FF5A1F; }
+      h2 { font-family: 'Bricolage Grotesque', sans-serif; font-size: 18px; font-weight: 700; margin: 30px 0 12px; color: #0A0A0A; }
+      .meta { font-size: 13px; color: #5C5C5C; margin-bottom: 24px; }
+      table { width: 100%; border-collapse: collapse; margin: 0 0 24px; font-size: 13px; }
+      th { background: #FBF7F0; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 700; color: #5C5C5C; border-bottom: 1px solid #ddd; }
+      td { padding: 10px 12px; border-bottom: 1px solid #eee; }
+      tr.total td { font-weight: 700; background: #f5f1e9; border-top: 2px solid #0A0A0A; border-bottom: none; }
+      .num { text-align: right; font-variant-numeric: tabular-nums; }
+      .pos { color: #3FA961; }
+      .neg { color: #E11D74; }
+      .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 0 0 24px; }
+      .stat { padding: 16px; border: 1px solid #ddd; border-radius: 10px; }
+      .stat .label { font-size: 11px; color: #5C5C5C; text-transform: uppercase; font-weight: 700; letter-spacing: 0.4px; }
+      .stat .value { font-family: 'Bricolage Grotesque', sans-serif; font-size: 24px; font-weight: 600; margin-top: 6px; letter-spacing: -0.5px; }
+      .footer { font-size: 11px; color: #5C5C5C; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ccc; }
+      @media print { body { padding: 25px; } }
+    </style></head><body>${bodyHtml}<script>setTimeout(() => window.print(), 300);</script></body></html>`);
+  win.document.close();
+};
+
+const csvEscape = (v) => {
+  const s = String(v ?? "");
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+};
+const csvRow = (cells) => cells.map(csvEscape).join(",");
+const fmtCsv = (n) => Number(n).toFixed(2);
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
+// Build a report context from the current scope (campus or "all").
+const buildReportCtx = ({ ministries, payments, campuses, scope, periodLabel }) => {
+  const campus = scope === "all" ? null : campuses.find((c) => c.id === scope);
+  const scopeName = scope === "all" ? "All Campuses (HQ rollup)" : `${campus.name} · ${campus.address}`;
+  const scopedMinistries = scope === "all" ? ministries : ministries.filter((m) => m.campusId === scope);
+  const scopedPayments = scope === "all" ? payments : payments.filter((p) => p.campusId === scope);
+  const monthlyOverhead = scopedPayments.reduce((s, p) => s + p.amount, 0);
+  const ministryBudget = scopedMinistries.reduce((s, m) => s + m.budget, 0);
+  const ministrySpent = scopedMinistries.reduce((s, m) => s + m.spent, 0);
+  return {
+    scope, scopeName, periodLabel,
+    campus, campuses,
+    ministries: scopedMinistries,
+    payments: scopedPayments,
+    monthlyOverhead,
+    annualOverhead: monthlyOverhead * 12,
+    ministryBudget,
+    ministrySpent,
+    ministryVariance: ministryBudget - ministrySpent,
+    generatedAt: new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }),
+  };
+};
+
+// Per-report CSV builders.
+const REPORT_CSV = {
+  annual: (ctx) => [
+    csvRow(["Annual Financial Statement"]),
+    csvRow(["Scope", ctx.scopeName]),
+    csvRow(["Period", ctx.periodLabel]),
+    csvRow(["Generated", ctx.generatedAt]),
+    "",
+    csvRow(["Section", "Amount"]),
+    csvRow(["Annual operating overhead", fmtCsv(ctx.annualOverhead)]),
+    csvRow(["Ministry budget", fmtCsv(ctx.ministryBudget)]),
+    csvRow(["Ministry spent YTD", fmtCsv(ctx.ministrySpent)]),
+    csvRow(["Ministry variance", fmtCsv(ctx.ministryVariance)]),
+    "",
+    csvRow(["Ministry", "Budget", "Spent", "Variance", "% used"]),
+    ...ctx.ministries.map((m) => csvRow([m.name, fmtCsv(m.budget), fmtCsv(m.spent), fmtCsv(m.budget - m.spent), `${Math.round((m.spent / m.budget) * 100)}%`])),
+  ].join("\n"),
+
+  donor: (ctx) => [
+    csvRow(["Donor Year-End Letter Data"]),
+    csvRow(["Scope", ctx.scopeName]),
+    csvRow(["Period", ctx.periodLabel]),
+    csvRow(["Generated", ctx.generatedAt]),
+    "",
+    csvRow(["Donor name", "Email", "Total giving", "Last gift", "Pledge fulfilled"]),
+    ...["Anonymous", "M. Petrov", "Sarah K.", "J. Williams", "T. Garcia", "L. Vinogradov"].map((d, i) => csvRow([d, `${d.toLowerCase().replace(/[^a-z]/g, "")}@email.com`, (1200 + i * 350).toFixed(2), "2025-12-28", i % 2 ? "Yes" : "Partial"])),
+  ].join("\n"),
+
+  ministry: (ctx) => [
+    csvRow(["Ministry Budget vs. Actual"]),
+    csvRow(["Scope", ctx.scopeName]),
+    csvRow(["Period", ctx.periodLabel]),
+    csvRow(["Generated", ctx.generatedAt]),
+    "",
+    csvRow(["Ministry", "Leader", "Budget", "Spent", "Remaining", "% used", "Status"]),
+    ...ctx.ministries.map((m) => {
+      const pct = m.spent / m.budget;
+      const status = pct > 0.95 ? "Over budget" : pct > 0.8 ? "Watch" : "On track";
+      return csvRow([m.name, m.leader || "—", fmtCsv(m.budget), fmtCsv(m.spent), fmtCsv(m.budget - m.spent), `${Math.round(pct * 100)}%`, status]);
+    }),
+  ].join("\n"),
+
+  campus: (ctx) => [
+    csvRow(["Campus Comparison"]),
+    csvRow(["Scope", ctx.scopeName]),
+    csvRow(["Period", ctx.periodLabel]),
+    csvRow(["Generated", ctx.generatedAt]),
+    "",
+    csvRow(["Campus", "Type", "Donations", "Expenses", "Net", "Members", "Ministries"]),
+    ...ctx.campuses.map((c) => csvRow([c.name, c.isHQ ? "HQ" : "Satellite", fmtCsv(c.donations), fmtCsv(c.expenses), fmtCsv(c.donations - c.expenses), c.members, c.ministries])),
+  ].join("\n"),
+
+  board: (ctx) => [
+    csvRow(["Board Pack"]),
+    csvRow(["Scope", ctx.scopeName]),
+    csvRow(["Period", ctx.periodLabel]),
+    csvRow(["Generated", ctx.generatedAt]),
+    "",
+    csvRow(["Metric", "Value"]),
+    csvRow(["Annual operating overhead", fmtCsv(ctx.annualOverhead)]),
+    csvRow(["Total ministry budget", fmtCsv(ctx.ministryBudget)]),
+    csvRow(["Ministry YTD spent", fmtCsv(ctx.ministrySpent)]),
+    csvRow(["Variance to budget", fmtCsv(ctx.ministryVariance)]),
+    csvRow(["Recurring monthly payments", ctx.payments.length]),
+    csvRow(["Active ministries", ctx.ministries.length]),
+  ].join("\n"),
+
+  990: (ctx) => [
+    csvRow(["IRS Form 990 Worksheet"]),
+    csvRow(["Scope", ctx.scopeName]),
+    csvRow(["Period", ctx.periodLabel]),
+    csvRow(["Generated", ctx.generatedAt]),
+    "",
+    csvRow(["Line", "Description", "Amount"]),
+    csvRow(["1a", "Federated campaigns", "0.00"]),
+    csvRow(["1b", "Membership dues", "0.00"]),
+    csvRow(["1f", "All other contributions", fmtCsv(ctx.ministryBudget * 0.85)]),
+    csvRow(["7", "Total revenue", fmtCsv(ctx.annualOverhead + ctx.ministryBudget)]),
+    csvRow(["13", "Grants & similar amounts", "0.00"]),
+    csvRow(["15", "Compensation of officers", fmtCsv(ctx.annualOverhead * 0.4)]),
+    csvRow(["18", "Total expenses", fmtCsv(ctx.annualOverhead)]),
+    csvRow(["19", "Revenue less expenses", fmtCsv(ctx.ministryBudget - ctx.annualOverhead * 0.5)]),
+  ].join("\n"),
+};
+
+// Per-report HTML builders for printable PDF.
+const REPORT_HTML = {
+  annual: (ctx) => `
+    <div class="brand"><div class="brand-mark">S</div><div class="brand-name">Steward</div></div>
+    <h1>Annual Financial <em>Statement.</em></h1>
+    <div class="meta">${ctx.scopeName} · ${ctx.periodLabel} · Generated ${ctx.generatedAt}</div>
+    <div class="stat-grid">
+      <div class="stat"><div class="label">Annual overhead</div><div class="value">$${ctx.annualOverhead.toLocaleString()}</div></div>
+      <div class="stat"><div class="label">Ministry budget</div><div class="value">$${ctx.ministryBudget.toLocaleString()}</div></div>
+      <div class="stat"><div class="label">YTD spent</div><div class="value">$${ctx.ministrySpent.toLocaleString()}</div></div>
+      <div class="stat"><div class="label">Variance</div><div class="value pos">$${ctx.ministryVariance.toLocaleString()}</div></div>
+    </div>
+    <h2>Ministry breakdown</h2>
+    <table><thead><tr><th>Ministry</th><th>Leader</th><th class="num">Budget</th><th class="num">Spent</th><th class="num">Variance</th></tr></thead><tbody>
+      ${ctx.ministries.map((m) => `<tr><td>${m.name}</td><td>${m.leader || "—"}</td><td class="num">$${m.budget.toLocaleString()}</td><td class="num">$${m.spent.toLocaleString()}</td><td class="num pos">$${(m.budget - m.spent).toLocaleString()}</td></tr>`).join("")}
+      <tr class="total"><td colspan="2">Total</td><td class="num">$${ctx.ministryBudget.toLocaleString()}</td><td class="num">$${ctx.ministrySpent.toLocaleString()}</td><td class="num pos">$${ctx.ministryVariance.toLocaleString()}</td></tr>
+    </tbody></table>
+    <div class="footer">Prepared by Steward · steward.app · Confidential</div>
+  `,
+
+  ministry: (ctx) => `
+    <div class="brand"><div class="brand-mark">S</div><div class="brand-name">Steward</div></div>
+    <h1>Ministry Budget vs. <em>Actual.</em></h1>
+    <div class="meta">${ctx.scopeName} · ${ctx.periodLabel} · Generated ${ctx.generatedAt}</div>
+    <table><thead><tr><th>Ministry</th><th>Leader</th><th class="num">Budget</th><th class="num">Spent</th><th class="num">% Used</th><th>Status</th></tr></thead><tbody>
+      ${ctx.ministries.map((m) => { const pct = m.spent / m.budget; const status = pct > 0.95 ? "Over" : pct > 0.8 ? "Watch" : "On track"; return `<tr><td>${m.name}</td><td>${m.leader || "—"}</td><td class="num">$${m.budget.toLocaleString()}</td><td class="num">$${m.spent.toLocaleString()}</td><td class="num">${Math.round(pct * 100)}%</td><td>${status}</td></tr>`; }).join("")}
+    </tbody></table>
+    <div class="footer">Prepared by Steward · steward.app</div>
+  `,
+
+  campus: (ctx) => `
+    <div class="brand"><div class="brand-mark">S</div><div class="brand-name">Steward</div></div>
+    <h1>Campus <em>Comparison.</em></h1>
+    <div class="meta">${ctx.periodLabel} · Generated ${ctx.generatedAt}</div>
+    <table><thead><tr><th>Campus</th><th>Type</th><th class="num">Donations</th><th class="num">Expenses</th><th class="num">Net</th><th class="num">Members</th></tr></thead><tbody>
+      ${ctx.campuses.map((c) => { const net = c.donations - c.expenses; return `<tr><td>${c.name}</td><td>${c.isHQ ? "HQ" : "Satellite"}</td><td class="num">$${c.donations.toLocaleString()}</td><td class="num">$${c.expenses.toLocaleString()}</td><td class="num ${net >= 0 ? "pos" : "neg"}">${net >= 0 ? "+" : ""}$${net.toLocaleString()}</td><td class="num">${c.members}</td></tr>`; }).join("")}
+    </tbody></table>
+    <div class="footer">Prepared by Steward · steward.app</div>
+  `,
+
+  board: (ctx) => `
+    <div class="brand"><div class="brand-mark">S</div><div class="brand-name">Steward</div></div>
+    <h1>Board <em>Pack.</em></h1>
+    <div class="meta">${ctx.scopeName} · ${ctx.periodLabel} · Generated ${ctx.generatedAt}</div>
+    <h2>Key metrics</h2>
+    <div class="stat-grid">
+      <div class="stat"><div class="label">Annual overhead</div><div class="value">$${ctx.annualOverhead.toLocaleString()}</div></div>
+      <div class="stat"><div class="label">Ministry budget</div><div class="value">$${ctx.ministryBudget.toLocaleString()}</div></div>
+      <div class="stat"><div class="label">YTD spent</div><div class="value">$${ctx.ministrySpent.toLocaleString()}</div></div>
+      <div class="stat"><div class="label">Variance</div><div class="value pos">$${ctx.ministryVariance.toLocaleString()}</div></div>
+    </div>
+    <h2>Ministry summary</h2>
+    <table><thead><tr><th>Ministry</th><th class="num">Budget</th><th class="num">Spent</th></tr></thead><tbody>
+      ${ctx.ministries.map((m) => `<tr><td>${m.name}</td><td class="num">$${m.budget.toLocaleString()}</td><td class="num">$${m.spent.toLocaleString()}</td></tr>`).join("")}
+    </tbody></table>
+    <h2>Recurring overhead</h2>
+    <table><thead><tr><th>Line</th><th class="num">Day</th><th class="num">Monthly</th></tr></thead><tbody>
+      ${ctx.payments.map((p) => `<tr><td>${p.name}</td><td class="num">${p.dayOfMonth}</td><td class="num">$${p.amount.toLocaleString()}</td></tr>`).join("")}
+    </tbody></table>
+    <div class="footer">Prepared by Steward · steward.app · Confidential</div>
+  `,
+
+  donor: (ctx) => `
+    <div class="brand"><div class="brand-mark">S</div><div class="brand-name">Steward</div></div>
+    <h1>Donor Year-End <em>Letter Data.</em></h1>
+    <div class="meta">${ctx.scopeName} · ${ctx.periodLabel} · Generated ${ctx.generatedAt}</div>
+    <table><thead><tr><th>Donor</th><th>Email</th><th class="num">Total</th><th>Last gift</th></tr></thead><tbody>
+      ${["Anonymous", "M. Petrov", "Sarah K.", "J. Williams", "T. Garcia", "L. Vinogradov"].map((d, i) => `<tr><td>${d}</td><td>${d.toLowerCase().replace(/[^a-z]/g, "")}@email.com</td><td class="num">$${(1200 + i * 350).toLocaleString()}.00</td><td>2025-12-28</td></tr>`).join("")}
+    </tbody></table>
+    <div class="footer">Tax ID 91-XXXXXXX · Steward Church · Confidential</div>
+  `,
+
+  990: (ctx) => `
+    <div class="brand"><div class="brand-mark">S</div><div class="brand-name">Steward</div></div>
+    <h1>IRS Form 990 <em>Worksheet.</em></h1>
+    <div class="meta">${ctx.scopeName} · ${ctx.periodLabel} · Generated ${ctx.generatedAt}</div>
+    <table><thead><tr><th>Line</th><th>Description</th><th class="num">Amount</th></tr></thead><tbody>
+      <tr><td>1a</td><td>Federated campaigns</td><td class="num">$0.00</td></tr>
+      <tr><td>1b</td><td>Membership dues</td><td class="num">$0.00</td></tr>
+      <tr><td>1f</td><td>All other contributions</td><td class="num">$${(ctx.ministryBudget * 0.85).toLocaleString()}</td></tr>
+      <tr class="total"><td>7</td><td>Total revenue</td><td class="num">$${(ctx.annualOverhead + ctx.ministryBudget).toLocaleString()}</td></tr>
+      <tr><td>15</td><td>Compensation of officers</td><td class="num">$${(ctx.annualOverhead * 0.4).toLocaleString()}</td></tr>
+      <tr class="total"><td>18</td><td>Total expenses</td><td class="num">$${ctx.annualOverhead.toLocaleString()}</td></tr>
+    </tbody></table>
+    <div class="footer">Pre-filled from Steward · review with your accountant before filing</div>
+  `,
+};
+
+const ReportsPage = ({ campuses, ministries, recurringPayments }) => {
+  const [period, setPeriod] = useState("ytd");
+  const [campusFilter, setCampusFilter] = useState("all");
+  const [scopes, setScopes] = useState({});
+  const [generating, setGenerating] = useState(null);
+
+  const periodLabel = PERIOD_OPTIONS.find((p) => p.id === period)?.label || period;
+
+  // Per-card scope falls back to global filter unless overridden.
+  const scopeFor = (id) => scopes[id] !== undefined ? scopes[id] : campusFilter;
+  const setScope = (id, val) => setScopes((s) => ({ ...s, [id]: val }));
+
+  const generate = (id, format) => {
+    const scope = scopeFor(id);
+    const ctx = buildReportCtx({ ministries, payments: recurringPayments, campuses, scope, periodLabel });
+    setGenerating(`${id}-${format}`);
+    setTimeout(() => {
+      if (format === "csv") {
+        const csv = REPORT_CSV[id]?.(ctx) || "";
+        const fname = `${id}_${scope}_${todayStr()}.csv`;
+        downloadFile(fname, csv);
+      } else if (format === "pdf") {
+        const html = REPORT_HTML[id]?.(ctx) || `<h1>Report not available</h1>`;
+        openPrintWindow(REPORT_DEFINITIONS.find((r) => r.id === id)?.name || id, html);
+      }
+      setGenerating(null);
+    }, 600);
+  };
+
+  return (
+    <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* HERO */}
+      <Card style={{
+        padding: 24, position: "relative", overflow: "hidden",
+        background: `linear-gradient(135deg, ${COLORS.surface} 0%, rgba(212,255,0,0.06) 100%)`,
+        borderColor: COLORS.forest + "40",
+      }}>
+        <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 4, backgroundColor: COLORS.forest }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>Reports</div>
+            <div style={{ fontFamily: fontSerif, fontSize: 28, fontWeight: 400, fontStyle: "italic", color: COLORS.ink, marginTop: 6, lineHeight: 1.15, letterSpacing: -0.5 }}>
+              One click. PDF, Excel, or Google Sheets — your choice.
+            </div>
+            <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 6 }}>
+              Generate any report in seconds. Schedule the recurring ones to run themselves.
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 18 }}>
+            <div>
+              <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Generated YTD</div>
+              <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 600, color: COLORS.ink, marginTop: 2, letterSpacing: -0.5 }}>47</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Auto-scheduled</div>
+              <div style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 600, color: COLORS.forestText, marginTop: 2, letterSpacing: -0.5 }}>3</div>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* FILTER BAR */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap" }}>
+          {/* Period */}
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, marginBottom: 6 }}>Period</div>
+            <div style={{ display: "flex", gap: 4, padding: 4, backgroundColor: COLORS.cream, borderRadius: 99, border: `1px solid ${COLORS.border}` }}>
+              {PERIOD_OPTIONS.map((opt) => {
+                const active = period === opt.id;
+                return (
+                  <button key={opt.id} onClick={() => setPeriod(opt.id)} style={{
+                    padding: "6px 12px", borderRadius: 99, border: "none", fontFamily: fontBody, fontWeight: 600, fontSize: 12,
+                    cursor: "pointer", backgroundColor: active ? COLORS.surface : "transparent",
+                    color: active ? COLORS.ink : COLORS.inkSoft,
+                    boxShadow: active ? `0 1px 4px rgba(0,0,0,0.1)` : "none",
+                  }}>
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {/* Campus */}
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, marginBottom: 6 }}>Campus</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <button
+                onClick={() => setCampusFilter("all")}
+                style={{
+                  padding: "6px 12px", borderRadius: 99, fontFamily: fontBody, fontWeight: 700, fontSize: 12, cursor: "pointer",
+                  border: campusFilter === "all" ? "none" : `1px solid ${COLORS.border}`,
+                  backgroundColor: campusFilter === "all" ? COLORS.ink : "transparent",
+                  color: campusFilter === "all" ? COLORS.surface : COLORS.ink,
+                }}
+              >All</button>
+              {campuses?.map((c) => {
+                const active = campusFilter === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => setCampusFilter(c.id)}
+                    style={{
+                      padding: "6px 12px", borderRadius: 99, fontFamily: fontBody, fontWeight: 700, fontSize: 12, cursor: "pointer",
+                      border: active ? "none" : `1px solid ${COLORS.border}`,
+                      backgroundColor: active ? c.color : "transparent",
+                      color: active ? textOnBg(c.color) : COLORS.ink,
+                      display: "flex", alignItems: "center", gap: 6,
+                    }}
+                  >
+                    {!active && <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: c.color }} />}
+                    {c.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        <button style={{
+          display: "flex", alignItems: "center", gap: 6,
+          padding: "9px 14px", border: `1px dashed ${COLORS.border}`, borderRadius: 8,
+          backgroundColor: "transparent", color: COLORS.ink, fontFamily: fontBody, fontWeight: 600, fontSize: 12, cursor: "pointer",
+        }}>
+          <Plus size={13} /> Custom report
+        </button>
+      </div>
+
+      {/* REPORT CARDS */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
+        {REPORT_DEFINITIONS.map((r) => {
+          const Icon = r.icon;
+          const csvBusy = generating === `${r.id}-csv`;
+          const pdfBusy = generating === `${r.id}-pdf`;
+          const cardScope = scopeFor(r.id);
+          const scopedCampus = campuses.find((c) => c.id === cardScope);
+
+          return (
+            <Card key={r.id} style={{ padding: 22, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, backgroundColor: r.color }} />
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginTop: 4 }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: 11,
+                  backgroundColor: r.color + "20", color: r.color,
+                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                }}>
+                  <Icon size={20} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                    <div style={{ fontFamily: fontDisplay, fontSize: 17, fontWeight: 600, color: COLORS.ink }}>{r.name}</div>
+                    {r.badge && <Pill tone={r.badge.tone}>{r.badge.label}</Pill>}
+                  </div>
+                  <div style={{ fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.5 }}>{r.desc}</div>
+                </div>
+              </div>
+
+              {/* Scope picker */}
+              <div style={{ padding: 10, borderRadius: 9, border: `1px solid ${COLORS.borderSoft}`, backgroundColor: COLORS.cream, display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  {cardScope === "all" ? (
+                    <Globe size={13} color={COLORS.copper} />
+                  ) : (
+                    <span style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: scopedCampus?.color || COLORS.inkSoft }} />
+                  )}
+                  <span style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Scope</span>
+                </div>
+                <select
+                  value={cardScope}
+                  onChange={(e) => setScope(r.id, e.target.value)}
+                  style={{
+                    flex: 1, padding: "5px 8px", border: `1px solid ${COLORS.border}`,
+                    borderRadius: 6, fontFamily: fontBody, fontSize: 12, fontWeight: 600,
+                    color: COLORS.ink, backgroundColor: COLORS.surface, cursor: "pointer", outline: "none",
+                  }}
+                >
+                  <option value="all">All campuses · HQ rollup</option>
+                  {campuses.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}{c.isHQ ? " · HQ only" : ` only`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                {r.formats.map((f) => (
+                  <span key={f} style={{
+                    padding: "3px 9px", borderRadius: 5, fontSize: 10, fontWeight: 700,
+                    backgroundColor: COLORS.cream, color: COLORS.inkSoft,
+                    textTransform: "uppercase", letterSpacing: 0.4, border: `1px solid ${COLORS.borderSoft}`,
+                  }}>{f}</span>
+                ))}
+                <span style={{ marginLeft: "auto", fontSize: 11, color: COLORS.inkSoft }}>
+                  Last: <strong style={{ color: COLORS.ink }}>{r.lastRun}</strong>
+                </span>
+              </div>
+
+              <div style={{ display: "flex", gap: 6 }}>
+                <button
+                  onClick={() => generate(r.id, "csv")}
+                  disabled={csvBusy || pdfBusy}
+                  style={{
+                    flex: 1, padding: "10px 14px", border: "none", borderRadius: 9,
+                    backgroundColor: COLORS.forest, color: ON_LIME,
+                    fontFamily: fontBody, fontWeight: 700, fontSize: 12,
+                    cursor: (csvBusy || pdfBusy) ? "wait" : "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    opacity: (csvBusy || pdfBusy) ? 0.7 : 1,
+                  }}
+                >
+                  {csvBusy ? <><RefreshCw size={12} style={{ animation: "spin 0.9s linear infinite" }} /> CSV…</> : <><Download size={12} /> Download CSV</>}
+                </button>
+                <button
+                  onClick={() => generate(r.id, "pdf")}
+                  disabled={csvBusy || pdfBusy}
+                  style={{
+                    flex: 1, padding: "10px 14px", border: `1px solid ${COLORS.border}`, borderRadius: 9,
+                    backgroundColor: "transparent", color: COLORS.ink,
+                    fontFamily: fontBody, fontWeight: 700, fontSize: 12,
+                    cursor: (csvBusy || pdfBusy) ? "wait" : "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  }}
+                >
+                  {pdfBusy ? <><RefreshCw size={12} style={{ animation: "spin 0.9s linear infinite" }} /> PDF…</> : <><FileText size={12} /> Print PDF</>}
+                </button>
+                <button style={{
+                  padding: "10px 12px", border: `1px solid ${COLORS.border}`, borderRadius: 9,
+                  backgroundColor: "transparent", color: COLORS.inkSoft,
+                  fontFamily: fontBody, fontWeight: 600, fontSize: 12, cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 5,
+                }} title="Schedule">
+                  <Clock size={12} />
+                </button>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* RECENTLY GENERATED */}
+      <Card style={{ padding: 22 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
+          <div style={{ fontFamily: fontSerif, fontSize: 20, fontStyle: "italic", color: COLORS.ink }}>Recently generated</div>
+          <a href="#" style={{ fontSize: 12, color: COLORS.copper, fontWeight: 700, textDecoration: "none" }}>View all →</a>
         </div>
         {[
-          { name: "Annual Financial Statement 2025", date: "Dec 31, 2025", by: "Elena Volkov", size: "1.2 MB", format: "PDF" },
-          { name: "Q4 Ministry Report", date: "Dec 15, 2025", by: "Pastor Vladimir", size: "840 KB", format: "PDF" },
-          { name: "Donor List for Year-End Letters", date: "Dec 10, 2025", by: "Elena Volkov", size: "2.1 MB", format: "Excel" },
-          { name: "Camp & Retreat P&L", date: "Dec 1, 2025", by: "Elena Volkov", size: "320 KB", format: "PDF" },
-        ].map((e, i) => (
+          { name: "Annual Financial Statement 2025", date: "Dec 31, 2025", by: "Elena Volkov", size: "1.2 MB", format: "PDF",   color: COLORS.forest },
+          { name: "Q4 Ministry Report",              date: "Dec 15, 2025", by: "Pastor Vladimir", size: "840 KB", format: "PDF",   color: COLORS.green },
+          { name: "Donor List for Year-End Letters", date: "Dec 10, 2025", by: "Elena Volkov",    size: "2.1 MB", format: "EXCEL", color: COLORS.copper },
+          { name: "Camp & Retreat P&L",              date: "Dec 1, 2025",  by: "Elena Volkov",    size: "320 KB", format: "PDF",   color: COLORS.amber },
+        ].map((e, i, arr) => (
           <div key={i} style={{
-            padding: "14px 0", borderBottom: i < 3 ? `1px solid ${COLORS.borderSoft}` : "none",
-            display: "flex", alignItems: "center", gap: 14
+            padding: "12px 0", borderBottom: i < arr.length - 1 ? `1px solid ${COLORS.borderSoft}` : "none",
+            display: "flex", alignItems: "center", gap: 14,
           }}>
-            <div style={{ width: 36, height: 36, borderRadius: 8, backgroundColor: COLORS.cream, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <FileText size={15} color={COLORS.copper} />
+            <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: e.color + "20", color: e.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <FileText size={14} />
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{e.name}</div>
               <div style={{ fontSize: 11, color: COLORS.inkSoft }}>{e.date} · by {e.by} · {e.size}</div>
             </div>
             <Pill tone="copper">{e.format}</Pill>
-            <button style={{ background: "transparent", border: "none", cursor: "pointer", color: COLORS.ink, padding: 6 }}>
-              <Download size={15} />
+            <button style={{ background: "transparent", border: `1px solid ${COLORS.border}`, cursor: "pointer", color: COLORS.ink, padding: 7, borderRadius: 7 }}>
+              <Download size={13} />
             </button>
           </div>
         ))}
       </Card>
+
+      {/* spinner keyframes */}
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };
@@ -4832,7 +5660,7 @@ const ReceiptModal = ({ ministry, onClose }) => {
               <div style={{ fontSize: 12, color: COLORS.inkSoft }}>or click to browse · jpg, png, pdf · up to 20 MB</div>
             </div>
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setStep(2)} style={{ flex: 1, padding: 12, backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 10, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, fontSize: 13 }}>
+              <button onClick={() => setStep(2)} style={{ flex: 1, padding: 12, backgroundColor: COLORS.forest, color: ON_LIME, border: "none", borderRadius: 10, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, fontSize: 13 }}>
                 Use sample receipt →
               </button>
               <button onClick={onClose} style={{ padding: 12, backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 10, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, fontSize: 13 }}>
@@ -4863,7 +5691,7 @@ const ReceiptModal = ({ ministry, onClose }) => {
               ))}
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-              <button onClick={onClose} style={{ flex: 1, padding: 12, backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", borderRadius: 10, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              <button onClick={onClose} style={{ flex: 1, padding: 12, backgroundColor: COLORS.forest, color: ON_LIME, border: "none", borderRadius: 10, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                 <Check size={14} /> Submit & sync to QuickBooks
               </button>
               <button onClick={() => setStep(1)} style={{ padding: 12, backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 10, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, fontSize: 13 }}>
@@ -4884,6 +5712,8 @@ const ReceiptModal = ({ ministry, onClose }) => {
 function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
   const [activePage, setActivePage] = useState("dashboard");
   const [activeCampus, setActiveCampus] = useState("all");
+  const [themeMode, setThemeMode] = useState("dark");
+  setActiveTheme(themeMode); // applied on every render before children read COLORS
   const [receiptModal, setReceiptModal] = useState({ open: false, ministry: null });
 
   // Lifted: ministries are the shared source of truth across Budget, Dashboard,
@@ -4898,29 +5728,53 @@ function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
   const renameMinistry = (id, name) => {
     setMinistries((prev) => prev.map((m) => (m.id === id ? { ...m, name } : m)));
   };
-  const addMinistry = ({ name, budget, leader = "" }) => {
+  const addMinistry = ({ name, budget, leader = "", campusId }) => {
     const id = slugify(name);
     let uniqueId = id;
     let i = 2;
     while (ministries.some((m) => m.id === uniqueId)) uniqueId = `${id}-${i++}`;
     const idx = ministries.length;
+    // If creating from "All" view without explicit campusId, default to HQ.
+    const targetCampus = campusId || (activeCampus !== "all" ? activeCampus : (campuses.find((c) => c.isHQ)?.id ?? campuses[0]?.id));
     const ministry = {
-      id: uniqueId, name, budget, spent: 0, leader, campus: "main",
+      id: uniqueId, name, budget, spent: 0, leader, campusId: targetCampus,
       color: NEW_MINISTRY_PALETTE[idx % NEW_MINISTRY_PALETTE.length],
       icon: NEW_MINISTRY_ICONS[idx % NEW_MINISTRY_ICONS.length],
     };
     setMinistries((prev) => [...prev, ministry]);
     return uniqueId;
   };
+  // Campuses — single source of truth. Edits + new campuses ripple to
+  // CampusesPage, TopBar dropdown, IntegrationsPage routing, and beyond.
+  const [campuses, setCampuses] = useState(INITIAL_CAMPUSES);
+  const addCampus = ({ name, address, color }) => {
+    const baseId = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `campus-${Date.now()}`;
+    let id = baseId;
+    let i = 2;
+    while (campuses.some((c) => c.id === id)) id = `${baseId}-${i++}`;
+    const idx = campuses.length;
+    setCampuses((prev) => [...prev, {
+      id, name: name.trim(), address: address.trim(),
+      isHQ: false,
+      short: name.trim().charAt(0).toUpperCase(),
+      color: color || NEW_MINISTRY_PALETTE[idx % NEW_MINISTRY_PALETTE.length],
+      donations: 0, expenses: 0, members: 0, ministries: 0,
+    }]);
+  };
+
   // Recurring payments — single source of truth for monthly overhead.
   // Calendar page edits flow back to Budget overhead, alerts, what-if, etc.
   const [recurringPayments, setRecurringPayments] = useState(INITIAL_RECURRING_PAYMENTS);
   const saveRecurringPayment = (p) => {
     setRecurringPayments((prev) => {
       const idx = prev.findIndex((x) => x.id === p.id);
-      if (idx === -1) return [...prev, p];
+      // Auto-tag new payments with the active campus (or HQ when in All view).
+      const withCampus = p.campusId
+        ? p
+        : { ...p, campusId: activeCampus !== "all" ? activeCampus : (campuses.find((c) => c.isHQ)?.id ?? campuses[0]?.id) };
+      if (idx === -1) return [...prev, withCampus];
       const next = [...prev];
-      next[idx] = p;
+      next[idx] = withCampus;
       return next;
     });
   };
@@ -4928,18 +5782,46 @@ function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
     setRecurringPayments((prev) => prev.filter((x) => x.id !== id));
   };
 
+  // CAMPUS FILTER — when activeCampus is "all" everything aggregates;
+  // when a specific campus is selected, finance views show its slice only.
+  const filteredMinistries = useMemo(
+    () => activeCampus === "all" ? ministries : ministries.filter((m) => m.campusId === activeCampus),
+    [ministries, activeCampus]
+  );
+  const filteredRecurringPayments = useMemo(
+    () => activeCampus === "all" ? recurringPayments : recurringPayments.filter((p) => p.campusId === activeCampus),
+    [recurringPayments, activeCampus]
+  );
+
   // Survival floor = essentials only (Facilities + People).
-  // Operating overhead = all recurring payments.
+  // Operating overhead = filtered recurring payments.
   const operatingOverheadMo = useMemo(
-    () => recurringPayments.reduce((s, p) => s + p.amount, 0),
-    [recurringPayments]
+    () => filteredRecurringPayments.reduce((s, p) => s + p.amount, 0),
+    [filteredRecurringPayments]
   );
   const survivalFloorMo = useMemo(
-    () => recurringPayments
+    () => filteredRecurringPayments
       .filter((p) => p.category === "facilities" || p.category === "people")
       .reduce((s, p) => s + p.amount, 0),
-    [recurringPayments]
+    [filteredRecurringPayments]
   );
+
+  // Per-campus derived stats — for CampusesPage cards.
+  const campusStats = useMemo(() => campuses.map((c) => {
+    const cMinistries = ministries.filter((m) => m.campusId === c.id);
+    const cPayments = recurringPayments.filter((p) => p.campusId === c.id);
+    const ministryBudget = cMinistries.reduce((s, m) => s + m.budget, 0);
+    const ministrySpent = cMinistries.reduce((s, m) => s + m.spent, 0);
+    const monthlyOverhead = cPayments.reduce((s, p) => s + p.amount, 0);
+    return {
+      ...c,
+      ministryCount: cMinistries.length,
+      paymentCount: cPayments.length,
+      ministryBudget,
+      ministrySpent,
+      annualOverhead: monthlyOverhead * 12,
+    };
+  }), [campuses, ministries, recurringPayments]);
 
   // Audit trail: every Roll/Return/Apply/Approve/Snooze appends one entry.
   // Activity page reads from this; nothing is mutated except via logActivity.
@@ -4966,7 +5848,7 @@ function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
     const id = `admin-${Date.now()}`;
     setAdmins((prev) => [...prev, {
       id, name: "New Administrator", avatar: "NA",
-      type: "function", campus: "Main", title: "Click title to edit",
+      type: "function", campus: "Bellevue", title: "Click title to edit",
       bio: "Click any name to rename.",
     }]);
   };
@@ -4986,27 +5868,30 @@ function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
     people: { t: "People & Roles", s: "Manage who can see and do what" },
     integrations: { t: "Integrations", s: "Stripe · Square · QuickBooks · and more" },
     reports: { t: "Reports", s: "Generate any report in one click" },
+    settings: { t: "Settings", s: "Theme, account preferences, and billing" },
   };
 
   const content = useMemo(() => {
     const open = (m) => setReceiptModal({ open: true, ministry: m });
     switch (activePage) {
-      case "dashboard": return <DashboardPage ministries={ministries} operatingOverheadMo={operatingOverheadMo} survivalFloorMo={survivalFloorMo} />;
+      case "dashboard": return <DashboardPage ministries={filteredMinistries} operatingOverheadMo={operatingOverheadMo} survivalFloorMo={survivalFloorMo} activeCampus={activeCampus} campuses={campuses} />;
       case "donations": return <DonationsPage />;
       case "expenses": return <ExpensesPage />;
       case "budget": return <BudgetPage
-        ministries={ministries} updateMinistryBudget={updateMinistryBudget} logActivity={logActivity}
-        recurringPayments={recurringPayments}
+        ministries={filteredMinistries} updateMinistryBudget={updateMinistryBudget} logActivity={logActivity}
+        recurringPayments={filteredRecurringPayments}
         operatingOverheadMo={operatingOverheadMo}
         survivalFloorMo={survivalFloorMo}
       />;
       case "calendar": return <CalendarPage
-        recurringPayments={recurringPayments}
+        recurringPayments={filteredRecurringPayments}
         savePayment={saveRecurringPayment}
         deletePayment={deleteRecurringPayment}
+        activeCampus={activeCampus}
+        campuses={campuses}
       />;
-      case "ministries": return <MinistriesPage openReceiptModal={open} ministries={ministries} addMinistry={addMinistry} />;
-      case "campuses": return <CampusesPage />;
+      case "ministries": return <MinistriesPage openReceiptModal={open} ministries={filteredMinistries} addMinistry={addMinistry} activeCampus={activeCampus} campuses={campuses} />;
+      case "campuses": return <CampusesPage campuses={campusStats} addCampus={addCampus} setActiveCampus={setActiveCampus} />;
       case "administrators": return <AdministratorsPage
         ministries={ministries} admins={admins}
         renameMinistry={renameMinistry} updateMinistryBudget={updateMinistryBudget} addMinistry={addMinistry}
@@ -5016,11 +5901,12 @@ function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
       case "receipts": return <ReceiptsPage openReceiptModal={open} />;
       case "activity": return <ActivityPage activityLog={activityLog} />;
       case "people": return <PeoplePage />;
-      case "integrations": return <IntegrationsPage />;
-      case "reports": return <ReportsPage />;
-      default: return <DashboardPage ministries={ministries} operatingOverheadMo={operatingOverheadMo} survivalFloorMo={survivalFloorMo} />;
+      case "integrations": return <IntegrationsPage campuses={campuses} />;
+      case "reports": return <ReportsPage campuses={campuses} ministries={ministries} recurringPayments={recurringPayments} />;
+      case "settings": return <SettingsPage themeMode={themeMode} setThemeMode={setThemeMode} onSignOut={onExitDemo} />;
+      default: return <DashboardPage ministries={filteredMinistries} operatingOverheadMo={operatingOverheadMo} survivalFloorMo={survivalFloorMo} activeCampus={activeCampus} campuses={campuses} />;
     }
-  }, [activePage, ministries, admins, activityLog, recurringPayments, operatingOverheadMo, survivalFloorMo]);
+  }, [activePage, ministries, admins, activityLog, recurringPayments, operatingOverheadMo, survivalFloorMo, campuses, activeCampus, filteredMinistries, filteredRecurringPayments, campusStats, themeMode]);
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: COLORS.bg, fontFamily: fontBody, color: COLORS.ink }}>
@@ -5050,6 +5936,7 @@ function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
           setActiveCampus={setActiveCampus}
           pageTitle={titles[activePage].t}
           pageSubtitle={titles[activePage].s}
+          campuses={campuses}
         />
         {content}
       </main>
@@ -5076,7 +5963,7 @@ const DemoBanner = ({ onExit }) => (
   }}>
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
       <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: COLORS.forest, boxShadow: `0 0 0 3px ${COLORS.forest}30` }} />
-      <span style={{ fontWeight: 700, color: COLORS.forest, textTransform: "uppercase", letterSpacing: 0.6, fontSize: 11 }}>Live demo</span>
+      <span style={{ fontWeight: 700, color: COLORS.forestText, textTransform: "uppercase", letterSpacing: 0.6, fontSize: 11 }}>Live demo</span>
       <span style={{ color: COLORS.inkSoft }}>·</span>
       <span style={{ color: COLORS.inkSoft }}>You're exploring real IRC Church 2025 data — feel free to click anything.</span>
     </div>
@@ -5095,7 +5982,7 @@ const StewardLogo = ({ inverse = false }) => (
     <div style={{
       width: 32, height: 32, borderRadius: 8, backgroundColor: COLORS.forest,
       display: "flex", alignItems: "center", justifyContent: "center",
-      color: COLORS.bg, fontFamily: fontDisplay, fontWeight: 700, fontSize: 18,
+      color: ON_LIME, fontFamily: fontDisplay, fontWeight: 700, fontSize: 18,
     }}>S</div>
     <div style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 700, color: inverse ? COLORS.bg : COLORS.ink, letterSpacing: -0.3 }}>Steward</div>
   </div>
@@ -5119,6 +6006,7 @@ const PRICING = [
 ];
 
 const Landing = ({ onLogin, onSignup, onDemo }) => {
+  setActiveTheme("dark"); // marketing always renders dark
   return (
     <div style={{ backgroundColor: COLORS.bg, color: COLORS.ink, fontFamily: fontBody, minHeight: "100vh" }}>
       <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -5141,7 +6029,7 @@ const Landing = ({ onLogin, onSignup, onDemo }) => {
           <a href="#churches" style={{ color: COLORS.ink, fontSize: 13, fontWeight: 500, textDecoration: "none" }}>Churches</a>
           <button onClick={onLogin} style={{ background: "transparent", border: "none", color: COLORS.ink, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: fontBody }}>Log in</button>
           <button onClick={onSignup} style={{
-            backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", padding: "10px 18px", borderRadius: 99,
+            backgroundColor: COLORS.forest, color: ON_LIME, border: "none", padding: "10px 18px", borderRadius: 99,
             fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody,
           }}>
             Start free trial
@@ -5163,7 +6051,7 @@ const Landing = ({ onLogin, onSignup, onDemo }) => {
           Donations, budgets, ministries, receipts — connected to QuickBooks, watched by smart alerts, audited automatically. So pastors can lead without spreadsheets.
         </p>
         <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 32 }}>
-          <button onClick={onSignup} style={{ backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", padding: "16px 28px", borderRadius: 99, fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: fontBody, boxShadow: `0 12px 32px ${COLORS.forest}30` }}>
+          <button onClick={onSignup} style={{ backgroundColor: COLORS.forest, color: ON_LIME, border: "none", padding: "16px 28px", borderRadius: 99, fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: fontBody, boxShadow: `0 12px 32px ${COLORS.forest}30` }}>
             Start free trial
           </button>
           <button onClick={onDemo} style={{ backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, padding: "16px 28px", borderRadius: 99, fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: fontBody }}>
@@ -5191,11 +6079,11 @@ const Landing = ({ onLogin, onSignup, onDemo }) => {
             <div style={{ fontFamily: fontSerif, fontSize: 22, fontStyle: "italic", color: COLORS.ink, marginBottom: 18 }}>Good morning, Pastor V.</div>
             {/* health card */}
             <div style={{ padding: 20, borderRadius: 12, backgroundColor: "rgba(212,255,0,0.06)", border: `1px solid ${COLORS.forest}40`, marginBottom: 18, display: "flex", alignItems: "center", gap: 14 }}>
-              <div style={{ width: 38, height: 38, borderRadius: 9, backgroundColor: COLORS.forest, color: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 38, height: 38, borderRadius: 9, backgroundColor: COLORS.forest, color: ON_LIME, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Gauge size={18} strokeWidth={2.4} />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 10, color: COLORS.forest, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>Budget Health · On track</div>
+                <div style={{ fontSize: 10, color: COLORS.forestText, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>Budget Health · On track</div>
                 <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 600, color: COLORS.ink, marginTop: 4 }}>
                   On pace to cover overhead with $162k to spare this month.
                 </div>
@@ -5327,7 +6215,7 @@ const Landing = ({ onLogin, onSignup, onDemo }) => {
             14-day free trial. No credit card. Migrate from QuickBooks in under an hour.
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 26 }}>
-            <button onClick={onSignup} style={{ backgroundColor: COLORS.forest, color: COLORS.bg, border: "none", padding: "16px 28px", borderRadius: 99, fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: fontBody }}>
+            <button onClick={onSignup} style={{ backgroundColor: COLORS.forest, color: ON_LIME, border: "none", padding: "16px 28px", borderRadius: 99, fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: fontBody }}>
               Start free trial
             </button>
             <button onClick={onDemo} style={{ backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, padding: "16px 28px", borderRadius: 99, fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: fontBody }}>
@@ -5353,6 +6241,7 @@ const Landing = ({ onLogin, onSignup, onDemo }) => {
 // ----- LOGIN -------------------------------------------------
 
 const Login = ({ onSubmit, onDemo, onSignup, onBack }) => {
+  setActiveTheme("dark"); // login always renders dark
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const canSubmit = email.includes("@") && password.length >= 4;
@@ -5468,7 +6357,7 @@ const Login = ({ onSubmit, onDemo, onSignup, onBack }) => {
             "We stopped guessing about money and started <span style={{ color: COLORS.forest }}>leading with it.</span>"
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 26 }}>
-            <div style={{ width: 44, height: 44, borderRadius: "50%", backgroundColor: COLORS.forest, color: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>PV</div>
+            <div style={{ width: 44, height: 44, borderRadius: "50%", backgroundColor: COLORS.forest, color: ON_LIME, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>PV</div>
             <div>
               <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>Pastor Vladimir</div>
               <div style={{ fontSize: 12, color: COLORS.inkSoft }}>Senior Pastor · IRC Church · 1,500 members</div>
