@@ -448,9 +448,9 @@ const DONATION_TARGET_YR = 1980000;
 const PLANNED_SURPLUS_YR = DONATION_TARGET_YR - OPERATING_BUDGET_YR;
 
 const DONATION_TIERS = [
-  { name: "Survival", target: SURVIVAL_FLOOR_MO * 12, desc: "Keeps the doors open. Bare essentials only.", color: COLORS.red },
-  { name: "Operating", target: OPERATING_BUDGET_YR, desc: "Full ministry calendar at planned scale.", color: COLORS.amber },
-  { name: "Vision", target: DONATION_TARGET_YR, desc: "Operating + savings + new initiatives.", color: COLORS.green },
+  { name: "Survival",  target: SURVIVAL_FLOOR_MO * 12, desc: "Keeps the doors open. Bare essentials only.",   get color() { return COLORS.red; } },
+  { name: "Operating", target: OPERATING_BUDGET_YR,    desc: "Full ministry calendar at planned scale.",       get color() { return COLORS.amber; } },
+  { name: "Vision",    target: DONATION_TARGET_YR,     desc: "Operating + savings + new initiatives.",         get color() { return COLORS.green; } },
 ];
 
 // Last-month (April 2026) spend per ministry — drives end-of-month reconciliation.
@@ -1301,6 +1301,17 @@ const DashboardPage = ({ ministries, operatingOverheadMo, survivalFloorMo, activ
 
 const DonationsPage = () => {
   const [filter, setFilter] = useState("all");
+  const [syncing, setSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState("2 min ago");
+
+  const handleSync = () => {
+    if (syncing) return;
+    setSyncing(true);
+    setTimeout(() => {
+      setSyncing(false);
+      setLastSync("just now");
+    }, 1500);
+  };
 
   return (
     <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 20 }}>
@@ -1309,11 +1320,21 @@ const DonationsPage = () => {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div>
             <div style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 500, color: COLORS.ink, fontStyle: "italic" }}>Live giving sources</div>
-            <div style={{ fontSize: 12, color: COLORS.inkSoft }}>Connected payment platforms · synced every 15 min</div>
+            <div style={{ fontSize: 12, color: COLORS.inkSoft }}>Connected payment platforms · last synced {lastSync}</div>
           </div>
-          <button style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: ON_LIME, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
-            <RefreshCw size={13} /> Sync now
+          <button onClick={handleSync} disabled={syncing} style={{
+            display: "flex", alignItems: "center", gap: 6,
+            background: COLORS.forest, color: ON_LIME, border: "none",
+            padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600,
+            cursor: syncing ? "wait" : "pointer", opacity: syncing ? 0.7 : 1,
+          }}>
+            {syncing ? (
+              <><RefreshCw size={13} style={{ animation: "spin 0.9s linear infinite" }} /> Syncing…</>
+            ) : (
+              <><RefreshCw size={13} /> Sync now</>
+            )}
           </button>
+          <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
           {[
@@ -1469,9 +1490,9 @@ const ExpensesPage = () => {
 const ALERT_ICONS = { TrendingDown, AlertTriangle, Receipt, Flame };
 
 const SEVERITY_TONE = {
-  critical: { color: COLORS.red, bg: "rgba(255,59,138,0.18)", label: "Critical" },
-  warning: { color: COLORS.amber, bg: "rgba(251,191,36,0.18)", label: "Warning" },
-  info: { color: COLORS.copper, bg: "rgba(255,90,31,0.18)", label: "Info" },
+  critical: { get color() { return COLORS.red; },    bg: "rgba(255,59,138,0.18)", label: "Critical" },
+  warning:  { get color() { return COLORS.amber; },  bg: "rgba(251,191,36,0.18)", label: "Warning" },
+  info:     { get color() { return COLORS.copper; }, bg: "rgba(255,90,31,0.18)", label: "Info" },
 };
 
 const ThresholdsPanel = ({ config, alerts, updateThreshold }) => {
@@ -1789,10 +1810,10 @@ const MiniBarChart = ({ history, forecast }) => {
 };
 
 const REC_TONE = {
-  reduce: { color: COLORS.amber, label: "REDUCE", pillTone: "warn" },
-  increase: { color: COLORS.copper, label: "INCREASE", pillTone: "copper" },
-  volatile: { color: COLORS.red, label: "VOLATILE", pillTone: "danger" },
-  "on-track": { color: COLORS.green, label: "ON TRACK", pillTone: "success" },
+  reduce:     { get color() { return COLORS.amber; },  label: "REDUCE",   pillTone: "warn" },
+  increase:   { get color() { return COLORS.copper; }, label: "INCREASE", pillTone: "copper" },
+  volatile:   { get color() { return COLORS.red; },    label: "VOLATILE", pillTone: "danger" },
+  "on-track": { get color() { return COLORS.green; },  label: "ON TRACK", pillTone: "success" },
 };
 
 const RecommendationsSection = ({ ministries, updateMinistryBudget, logActivity }) => {
@@ -3279,19 +3300,21 @@ const BudgetPage = ({ ministries, updateMinistryBudget, logActivity, recurringPa
         </Card>
       </div>
 
-      {/* END-OF-MONTH RECONCILIATION */}
-      <ReconciliationSection ministries={ministries} logActivity={logActivity} />
+      {/* END-OF-MONTH RECONCILIATION (hidden from ministry leaders) */}
+      {!isMinistryLeader && <ReconciliationSection ministries={ministries} logActivity={logActivity} />}
 
-      {/* SMART RECOMMENDATIONS */}
-      <div ref={recsRef}>
-        <RecommendationsSection ministries={ministries} updateMinistryBudget={updateMinistryBudget} logActivity={logActivity} />
-      </div>
+      {/* SMART RECOMMENDATIONS (hidden from ministry leaders) */}
+      {!isMinistryLeader && (
+        <div ref={recsRef}>
+          <RecommendationsSection ministries={ministries} updateMinistryBudget={updateMinistryBudget} logActivity={logActivity} />
+        </div>
+      )}
 
-      {/* VARIANCE STATS */}
+      {/* VARIANCE STATS — read-only, always visible */}
       <VarianceSection ministries={ministries} />
 
-      {/* WHAT-IF SCENARIO BUILDER */}
-      <WhatIfScenarioSection ministries={ministries} updateMinistryBudget={updateMinistryBudget} logActivity={logActivity} operatingOverheadMo={operatingOverheadMo} survivalFloorMo={survivalFloorMo} />
+      {/* WHAT-IF SCENARIO BUILDER (hidden from ministry leaders) */}
+      {!isMinistryLeader && <WhatIfScenarioSection ministries={ministries} updateMinistryBudget={updateMinistryBudget} logActivity={logActivity} operatingOverheadMo={operatingOverheadMo} survivalFloorMo={survivalFloorMo} />}
 
       {/* MONTHLY OVERHEAD SETUP */}
       <Card style={{ padding: 28 }}>
@@ -4847,7 +4870,101 @@ const AdministratorsPage = ({
 // EVENTS PAGE
 // ============================================================
 
+const NewEventModal = ({ onSave, onClose }) => {
+  const [name, setName] = useState("");
+  const [type, setType] = useState("event");
+  const [attendees, setAttendees] = useState("");
+  const [status, setStatus] = useState("completed");
+  const canSave = name.trim() && Number(attendees) > 0;
+
+  const typeOptions = [
+    { id: "event",      label: "Event" },
+    { id: "camp",       label: "Camp" },
+    { id: "retreat",    label: "Retreat" },
+    { id: "conference", label: "Conference" },
+    { id: "school",     label: "School" },
+    { id: "meeting",    label: "Meeting" },
+  ];
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(10,10,10,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: COLORS.surface, borderRadius: 16, width: 540, maxWidth: "100%", boxShadow: "0 25px 80px rgba(0,0,0,0.6)", border: `1px solid ${COLORS.border}` }}>
+        <div style={{ padding: "22px 24px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>New event</div>
+            <div style={{ fontFamily: fontDisplay, fontSize: 19, fontWeight: 600, color: COLORS.ink, marginTop: 4 }}>Schedule an event or camp</div>
+            <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 4, fontStyle: "italic" }}>
+              Add to the calendar — you can attach a budget and tickets later from Smart Budget.
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}><X size={18} color={COLORS.inkSoft} /></button>
+        </div>
+        <div style={{ padding: 22, display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, marginBottom: 6 }}>Event name *</div>
+            <input
+              autoFocus value={name} onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Family Camp 2026"
+              style={{ width: "100%", padding: "10px 12px", fontSize: 13, fontFamily: fontBody, color: COLORS.ink, backgroundColor: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box" }}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, marginBottom: 6 }}>Type</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {typeOptions.map((t) => (
+                <button key={t.id} onClick={() => setType(t.id)} style={{
+                  padding: "7px 12px", border: type === t.id ? `2px solid ${COLORS.forest}` : `1px solid ${COLORS.border}`,
+                  borderRadius: 7, backgroundColor: type === t.id ? "rgba(212,255,0,0.06)" : "transparent",
+                  fontFamily: fontBody, fontWeight: 600, fontSize: 12, color: COLORS.ink, cursor: "pointer",
+                }}>{t.label}</button>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, marginBottom: 6 }}>Expected attendees *</div>
+              <input
+                type="number" value={attendees} onChange={(e) => setAttendees(e.target.value)}
+                placeholder="e.g. 150"
+                style={{ width: "100%", padding: "10px 12px", fontSize: 13, fontFamily: fontBody, color: COLORS.ink, backgroundColor: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box" }}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, marginBottom: 6 }}>Status</div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {[{ id: "completed", label: "One-time" }, { id: "recurring", label: "Recurring" }].map((s) => (
+                  <button key={s.id} onClick={() => setStatus(s.id)} style={{
+                    flex: 1, padding: "9px 12px", border: status === s.id ? `2px solid ${COLORS.forest}` : `1px solid ${COLORS.border}`,
+                    borderRadius: 7, backgroundColor: status === s.id ? "rgba(212,255,0,0.06)" : "transparent",
+                    fontFamily: fontBody, fontWeight: 600, fontSize: 12, color: COLORS.ink, cursor: "pointer",
+                  }}>{s.label}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: "16px 22px", borderTop: `1px solid ${COLORS.border}`, backgroundColor: COLORS.bg, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button onClick={onClose} style={{ padding: "10px 18px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody }}>Cancel</button>
+          <button onClick={() => canSave && onSave({ name: name.trim(), type, attendees: Number(attendees), status })} disabled={!canSave} style={{
+            padding: "10px 22px", border: "none", borderRadius: 9,
+            backgroundColor: canSave ? COLORS.forest : COLORS.cream,
+            color: canSave ? ON_LIME : COLORS.inkSoft,
+            fontWeight: 700, fontSize: 13, cursor: canSave ? "pointer" : "not-allowed", fontFamily: fontBody,
+            display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <Plus size={13} /> Add event
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const EventsPage = () => {
+  const [events, setEvents] = useState(EVENTS_CAMPS);
+  const [creating, setCreating] = useState(false);
+  const [recent, setRecent] = useState(null);
+
   const typeColor = {
     camp: COLORS.forest, retreat: COLORS.green, conference: COLORS.copper,
     school: COLORS.amber, event: "#22D3EE", meeting: COLORS.inkSoft,
@@ -4875,12 +4992,19 @@ const EventsPage = () => {
             <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 500, color: COLORS.ink, fontStyle: "italic" }}>All events & camps</div>
             <div style={{ fontSize: 12, color: COLORS.inkSoft }}>Track registration, attendance, and budgets</div>
           </div>
-          <button style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: ON_LIME, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
+          <button onClick={() => setCreating(true)} style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: ON_LIME, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
             <Plus size={14} /> New event
           </button>
         </div>
+        {recent && (
+          <Card style={{ padding: 12, marginBottom: 12, backgroundColor: "rgba(74,222,128,0.06)", borderColor: COLORS.green + "60", display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 26, height: 26, borderRadius: 6, backgroundColor: COLORS.green, color: ON_GREEN, display: "flex", alignItems: "center", justifyContent: "center" }}><Check size={13} strokeWidth={3} /></div>
+            <div style={{ flex: 1, fontSize: 12, color: COLORS.ink }}><strong>{recent.name}</strong> added · {recent.type} · {recent.attendees} expected</div>
+            <button onClick={() => setRecent(null)} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: COLORS.inkSoft }}><X size={14} /></button>
+          </Card>
+        )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-          {EVENTS_CAMPS.map((e, i) => (
+          {events.map((e, i) => (
             <div key={i} style={{
               padding: 16, border: `1px solid ${COLORS.border}`, borderRadius: 10,
               display: "flex", flexDirection: "column", gap: 8, cursor: "pointer", transition: "all 0.15s",
@@ -4902,6 +5026,13 @@ const EventsPage = () => {
           ))}
         </div>
       </Card>
+
+      {creating && (
+        <NewEventModal
+          onSave={(ev) => { setEvents((es) => [ev, ...es]); setRecent(ev); setCreating(false); }}
+          onClose={() => setCreating(false)}
+        />
+      )}
     </div>
   );
 };
@@ -5176,28 +5307,40 @@ const RoleBadge = ({ access }) => (
   </Pill>
 );
 
-const PersonRow = ({ p, canEdit }) => (
-  <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 100px auto", gap: 12, padding: "12px 14px", borderRadius: 8, alignItems: "center", backgroundColor: COLORS.bg, border: `1px solid ${COLORS.borderSoft}` }}>
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-      <div style={{ width: 34, height: 34, borderRadius: "50%", backgroundColor: COLORS.forest, color: ON_LIME, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12 }}>{p.avatar}</div>
+const PersonRow = ({ p, canEdit, onUpdate, onRemove }) => {
+  const updateField = (field) => (v) => onUpdate && onUpdate(p.email, field, v);
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 100px auto", gap: 12, padding: "12px 14px", borderRadius: 8, alignItems: "center", backgroundColor: COLORS.bg, border: `1px solid ${COLORS.borderSoft}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ width: 34, height: 34, borderRadius: "50%", backgroundColor: COLORS.forest, color: ON_LIME, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12 }}>{p.avatar}</div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          {canEdit ? (
+            <EditableText value={p.name} onChange={updateField("name")} style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink, fontFamily: fontBody }} />
+          ) : (
+            <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink, padding: "2px 6px" }}>{p.name}</div>
+          )}
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, padding: "0 6px" }}>{p.email}</div>
+        </div>
+      </div>
       <div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{p.name}</div>
-        <div style={{ fontSize: 11, color: COLORS.inkSoft }}>{p.email}</div>
+        {canEdit ? (
+          <EditableText value={p.role} onChange={updateField("role")} style={{ fontSize: 12, color: COLORS.ink, fontFamily: fontBody }} />
+        ) : (
+          <div style={{ fontSize: 12, color: COLORS.ink, padding: "2px 6px" }}>{p.role}</div>
+        )}
+      </div>
+      <RoleBadge access={p.access} />
+      <div style={{ fontSize: 11, color: p.lastActive.includes("now") ? COLORS.green : COLORS.inkSoft }}>{p.lastActive}</div>
+      <div style={{ display: "flex", gap: 4 }}>
+        {canEdit && onRemove ? (
+          <button title="Remove" onClick={() => { if (confirm(`Remove ${p.name}?`)) onRemove(p.email); }} style={{ background: "transparent", border: "none", padding: 6, cursor: "pointer", color: COLORS.red, borderRadius: 6 }}>
+            <Trash2 size={13} />
+          </button>
+        ) : null}
       </div>
     </div>
-    <div style={{ fontSize: 12, color: COLORS.ink }}>{p.role}</div>
-    <RoleBadge access={p.access} />
-    <div style={{ fontSize: 11, color: p.lastActive.includes("now") ? COLORS.green : COLORS.inkSoft }}>{p.lastActive}</div>
-    <div style={{ display: "flex", gap: 4 }}>
-      {canEdit ? (
-        <>
-          <button title="Edit" style={{ background: "transparent", border: "none", padding: 6, cursor: "pointer", color: COLORS.inkSoft, borderRadius: 6 }}><Edit3 size={13} /></button>
-          <button title="Remove" style={{ background: "transparent", border: "none", padding: 6, cursor: "pointer", color: COLORS.red, borderRadius: 6 }}><Trash2 size={13} /></button>
-        </>
-      ) : null}
-    </div>
-  </div>
-);
+  );
+};
 
 const InviteAdminModal = ({ currentUser, campuses, ministries, onClose, onInvite }) => {
   const isHQ = currentUser?.role === ROLE_HQ;
@@ -5297,15 +5440,45 @@ const PeoplePage = ({ currentUser, users, campuses, ministries, admins }) => {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [expanded, setExpanded] = useState({});
   const [recentInvite, setRecentInvite] = useState(null);
+  // Team is lifted to local state so inline edits persist within the session.
+  const [team, setTeam] = useState(TEAM);
+  const [recentEdit, setRecentEdit] = useState(null);
 
   const isHQ = currentUser?.role === ROLE_HQ;
   const isCampusAdmin = currentUser?.role === ROLE_CAMPUS;
   const isMinistryLeader = currentUser?.role === ROLE_MINISTRY;
 
+  // Update a team member's field (name or role string). Email is the stable key.
+  const updateMember = (email, field, value) => {
+    setTeam((prev) => prev.map((m) => (m.email === email ? { ...m, [field]: value } : m)));
+    setRecentEdit({ email, field });
+    setTimeout(() => setRecentEdit(null), 2400);
+  };
+  const removeMember = (email) => {
+    setTeam((prev) => prev.filter((m) => m.email !== email));
+  };
+
+  // Can the current user edit this team member?
+  const canEditMember = (p) => {
+    if (isHQ) return true;
+    if (isCampusAdmin) {
+      // Campus admin can edit their campus members (but not HQ admins) + themselves.
+      const isHQTarget = accessToRole(p.access) === ROLE_HQ;
+      if (isHQTarget) return false;
+      if (p.campus === campuses.find((c) => c.id === currentUser.campusId)?.name) return true;
+      return p.email === currentUser.id.replace("u-", "") + "@ircchurch.org";
+    }
+    if (isMinistryLeader) {
+      // Ministry leader can only edit themselves.
+      return p.email === currentUser.id.replace("u-", "") + "@ircchurch.org";
+    }
+    return false;
+  };
+
   // Group team. Team members have campus name like "Bellevue", "Tacoma", "All".
-  const hqMembers = TEAM.filter((t) => accessToRole(t.access) === ROLE_HQ);
+  const hqMembers = team.filter((t) => accessToRole(t.access) === ROLE_HQ);
   const campusGroups = campuses.map((c) => {
-    const members = TEAM.filter((t) => t.campus === c.name);
+    const members = team.filter((t) => t.campus === c.name);
     const admin = members.find((m) => accessToRole(m.access) === ROLE_CAMPUS);
     const leaders = members.filter((m) => accessToRole(m.access) === ROLE_MINISTRY);
     return { campus: c, admin, leaders };
@@ -5341,6 +5514,24 @@ const PeoplePage = ({ currentUser, users, campuses, ministries, admins }) => {
         )}
       </div>
 
+      {/* INLINE EDIT HINT */}
+      {!isMinistryLeader && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: COLORS.inkSoft, fontStyle: "italic", padding: "0 2px" }}>
+          <Edit3 size={11} color={COLORS.copper} />
+          <span>Click any name or role to edit · Enter saves · Esc cancels</span>
+        </div>
+      )}
+
+      {/* RECENT EDIT FLASH */}
+      {recentEdit && (
+        <Card style={{ padding: 12, backgroundColor: "rgba(212,255,0,0.06)", borderColor: COLORS.forest + "60", display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: COLORS.forest, color: ON_LIME, display: "flex", alignItems: "center", justifyContent: "center" }}><Check size={12} strokeWidth={3} /></div>
+          <div style={{ flex: 1, fontSize: 12, color: COLORS.ink }}>
+            Saved <strong>{recentEdit.field}</strong> · {recentEdit.email}
+          </div>
+        </Card>
+      )}
+
       {/* RECENT INVITE FLASH */}
       {recentInvite && (
         <Card style={{ padding: 14, backgroundColor: "rgba(74,222,128,0.06)", borderColor: COLORS.green + "60", display: "flex", alignItems: "center", gap: 12 }}>
@@ -5363,7 +5554,7 @@ const PeoplePage = ({ currentUser, users, campuses, ministries, admins }) => {
             <span style={{ fontSize: 12, color: COLORS.inkSoft, marginLeft: "auto" }}>Org-wide access · all campuses</span>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {visibleHQ.map((p, i) => <PersonRow key={i} p={p} canEdit={isHQ} />)}
+            {visibleHQ.map((p, i) => <PersonRow key={p.email} p={p} canEdit={canEditMember(p)} onUpdate={updateMember} onRemove={isHQ ? removeMember : null} />)}
           </div>
         </Card>
       )}
@@ -5400,7 +5591,7 @@ const PeoplePage = ({ currentUser, users, campuses, ministries, admins }) => {
                 {g.admin ? (
                   <div>
                     <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, marginBottom: 6 }}>Campus admin</div>
-                    <PersonRow p={g.admin} canEdit={isHQ} />
+                    <PersonRow p={g.admin} canEdit={canEditMember(g.admin)} onUpdate={updateMember} onRemove={isHQ ? removeMember : null} />
                   </div>
                 ) : g.campus.isHQ ? null : (
                   <div style={{ padding: 14, border: `1px dashed ${COLORS.border}`, borderRadius: 9, textAlign: "center" }}>
@@ -5422,7 +5613,7 @@ const PeoplePage = ({ currentUser, users, campuses, ministries, admins }) => {
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {g.leaders.map((p, i) => {
                         const isSelf = currentUser?.role === ROLE_MINISTRY && p.email.startsWith(currentUser.id.replace("u-", ""));
-                        return <PersonRow key={i} p={p} canEdit={isHQ || (isCampusAdmin && currentUser.campusId === g.campus.id)} />;
+                        return <PersonRow key={p.email} p={p} canEdit={canEditMember(p)} onUpdate={updateMember} onRemove={isHQ || (isCampusAdmin && currentUser.campusId === g.campus.id) ? removeMember : null} />;
                       })}
                     </div>
                   )}
@@ -5798,11 +5989,9 @@ const ConnectionModal = ({ integration, existing, defaultScope, campuses, onConn
   );
 };
 
-const IntegrationsPage = ({ campuses }) => {
-  // Connections is an array — multiple instances per integration allowed
-  // for donation providers (one per campus). Non-donation integrations
-  // get one entry with scope='all'.
-  const [connections, setConnections] = useState(INITIAL_CONNECTIONS);
+const IntegrationsPage = ({ campuses, connections, upsertConnection, removeConnection }) => {
+  // `connections` is now lifted from IRCChurchApp so the Donation Routing
+  // panel in Settings sees the same source of truth.
   // editing: { integration, connection?, mode: 'new' | 'add-campus' | 'edit' }
   const [editing, setEditing] = useState(null);
 
@@ -5817,29 +6006,28 @@ const IntegrationsPage = ({ campuses }) => {
   const connect = (integration, credentials, scope) => {
     if (editing?.connection) {
       // Update existing
-      const id = editing.connection.id;
-      setConnections((cs) => cs.map((c) => c.id === id ? { ...c, credentials } : c));
+      upsertConnection({ ...editing.connection, credentials });
     } else {
       // Add new
-      setConnections((cs) => [...cs, {
+      upsertConnection({
         id: `conn-${integration.name.toLowerCase().replace(/\s+/g, "-")}-${scope}-${Date.now()}`,
         integrationName: integration.name,
         scope,
         credentials,
         connectedAt: Date.now(),
         lastSync: Date.now(),
-      }]);
+      });
     }
     setEditing(null);
   };
 
   const disconnect = (connection) => {
     if (!confirm(`Disconnect this ${connection.integrationName} integration? Stored credentials will be cleared.`)) return;
-    setConnections((cs) => cs.filter((c) => c.id !== connection.id));
+    removeConnection(connection.id);
   };
 
   const sync = (connection) => {
-    setConnections((cs) => cs.map((c) => c.id === connection.id ? { ...c, lastSync: Date.now() } : c));
+    upsertConnection({ ...connection, lastSync: Date.now() });
   };
 
   // Group connections per integration
@@ -6388,13 +6576,122 @@ const DonationRoutingPanel = ({ currentUser, campuses, routingMode, setRoutingMo
   );
 };
 
+const TIMEZONES = [
+  { id: "America/Los_Angeles", label: "Pacific (PT)" },
+  { id: "America/Denver",      label: "Mountain (MT)" },
+  { id: "America/Chicago",     label: "Central (CT)" },
+  { id: "America/New_York",    label: "Eastern (ET)" },
+];
+const NOTIFICATION_MODES = [
+  { id: "off",         label: "Off" },
+  { id: "email",       label: "Email only" },
+  { id: "push",        label: "Push only" },
+  { id: "email-push",  label: "Email + push" },
+];
+
 const SettingsPage = ({ themeMode, setThemeMode, onSignOut, currentUser, campuses, routingMode, setRoutingMode, connections, upsertConnection }) => {
+  // Functional per-row state.
+  const [notifications, setNotifications] = useState("email-push");
+  const [timezone, setTimezone] = useState("America/Los_Angeles");
+  const [twoFactor, setTwoFactor] = useState(true);
+  const [receiptEmail, setReceiptEmail] = useState("receipts@steward.app");
+  const [expandedRow, setExpandedRow] = useState(null);
+  const [billingPlan] = useState("Growth · $199/mo");
+
+  const notifLabel = NOTIFICATION_MODES.find((m) => m.id === notifications)?.label || "Off";
+  const tzLabel = TIMEZONES.find((t) => t.id === timezone)?.label || timezone;
+
   const rows = [
-    { icon: BellRing, label: "Notifications",   value: "Email + push",                onClick: () => {} },
-    { icon: Globe,     label: "Time zone",       value: "Pacific (PT)",                onClick: () => {} },
-    { icon: CreditCard,label: "Billing",         value: "Growth · $199/mo",            onClick: () => {} },
-    { icon: Shield,    label: "Two-factor auth", value: "Enabled",                     active: true,    onClick: () => {} },
-    { icon: Mail,      label: "Receipt forwarding", value: "receipts@steward.app",     onClick: () => {} },
+    {
+      id: "notifications", icon: BellRing, label: "Notifications", value: notifLabel,
+      body: (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {NOTIFICATION_MODES.map((m) => (
+            <button key={m.id} onClick={() => setNotifications(m.id)} style={{
+              padding: "8px 14px", border: notifications === m.id ? `2px solid ${COLORS.forest}` : `1px solid ${COLORS.border}`,
+              borderRadius: 7, backgroundColor: notifications === m.id ? "rgba(212,255,0,0.06)" : "transparent",
+              fontFamily: fontBody, fontWeight: 600, fontSize: 12, color: COLORS.ink, cursor: "pointer",
+            }}>{m.label}</button>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: "timezone", icon: Globe, label: "Time zone", value: tzLabel,
+      body: (
+        <select value={timezone} onChange={(e) => setTimezone(e.target.value)} style={{
+          width: "100%", padding: "10px 12px", fontSize: 13, fontFamily: fontBody, color: COLORS.ink,
+          backgroundColor: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none",
+        }}>
+          {TIMEZONES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+        </select>
+      ),
+    },
+    {
+      id: "billing", icon: CreditCard, label: "Billing", value: billingPlan,
+      body: (
+        <div style={{ fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.6 }}>
+          <div style={{ marginBottom: 8 }}>
+            <strong style={{ color: COLORS.ink }}>Current plan:</strong> Growth · $199/mo · billed annually
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <strong style={{ color: COLORS.ink }}>Next charge:</strong> Jun 1, 2026
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <strong style={{ color: COLORS.ink }}>Payment method:</strong> Visa •••• 4421
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={{ padding: "8px 14px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>Change plan</button>
+            <button style={{ padding: "8px 14px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>Update card</button>
+            <button style={{ padding: "8px 14px", backgroundColor: "transparent", color: COLORS.inkSoft, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>View invoices</button>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "2fa", icon: Shield, label: "Two-factor auth", value: twoFactor ? "Enabled" : "Disabled", active: twoFactor,
+      body: (
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <button
+            onClick={() => setTwoFactor(!twoFactor)}
+            style={{
+              width: 44, height: 24, borderRadius: 12, border: "none", cursor: "pointer",
+              backgroundColor: twoFactor ? COLORS.green : COLORS.border, position: "relative", transition: "background 0.15s",
+            }}
+            aria-label="Toggle two-factor auth"
+          >
+            <span style={{
+              position: "absolute", top: 2, left: twoFactor ? 22 : 2, width: 20, height: 20, borderRadius: "50%",
+              backgroundColor: COLORS.surface, transition: "left 0.15s", boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+            }} />
+          </button>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.5, flex: 1 }}>
+            {twoFactor
+              ? <>Requires a 6-digit code from your authenticator app on every login. <strong style={{ color: COLORS.ink }}>Recommended.</strong></>
+              : <>Account is protected by password only. <strong style={{ color: COLORS.amber }}>Turn on for finance roles.</strong></>}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "receipts", icon: Mail, label: "Receipt forwarding", value: receiptEmail,
+      body: (
+        <div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, marginBottom: 6 }}>Forward address</div>
+          <input
+            value={receiptEmail}
+            onChange={(e) => setReceiptEmail(e.target.value)}
+            style={{
+              width: "100%", padding: "10px 12px", fontSize: 13, fontFamily: fontBody, color: COLORS.ink,
+              backgroundColor: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+            }}
+          />
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 6, fontStyle: "italic" }}>
+            Forward any receipt email to this address → AI extracts vendor, amount, date → auto-codes to the right ministry.
+          </div>
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -6480,27 +6777,33 @@ const SettingsPage = ({ themeMode, setThemeMode, onSignOut, currentUser, campuse
       <Card style={{ padding: 0, overflow: "hidden" }}>
         {rows.map((row, i) => {
           const Icon = row.icon;
+          const open = expandedRow === row.id;
           return (
-            <button
-              key={i}
-              onClick={row.onClick}
-              style={{
-                width: "100%", padding: "16px 20px", display: "flex", alignItems: "center", gap: 14,
-                backgroundColor: "transparent", border: "none", cursor: "pointer", fontFamily: fontBody, textAlign: "left",
-                borderBottom: i < rows.length - 1 ? `1px solid ${COLORS.borderSoft}` : "none",
-              }}
-            >
-              <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: COLORS.cream, color: COLORS.copper, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Icon size={15} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{row.label}</div>
-              </div>
-              <div style={{ fontSize: 12, color: row.active ? COLORS.green : COLORS.copper, fontWeight: 600 }}>
-                {row.value}
-              </div>
-              <ChevronRight size={14} color={COLORS.inkSoft} />
-            </button>
+            <div key={row.id} style={{ borderBottom: i < rows.length - 1 ? `1px solid ${COLORS.borderSoft}` : "none" }}>
+              <button
+                onClick={() => setExpandedRow(open ? null : row.id)}
+                style={{
+                  width: "100%", padding: "16px 20px", display: "flex", alignItems: "center", gap: 14,
+                  backgroundColor: open ? COLORS.cream : "transparent", border: "none", cursor: "pointer", fontFamily: fontBody, textAlign: "left",
+                }}
+              >
+                <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: COLORS.cream, color: COLORS.copper, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Icon size={15} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{row.label}</div>
+                </div>
+                <div style={{ fontSize: 12, color: row.active ? COLORS.green : COLORS.copper, fontWeight: 600 }}>
+                  {row.value}
+                </div>
+                <ChevronRight size={14} color={COLORS.inkSoft} style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s" }} />
+              </button>
+              {open && (
+                <div style={{ padding: "0 20px 18px 66px", borderTop: `1px solid ${COLORS.borderSoft}`, paddingTop: 14 }}>
+                  {row.body}
+                </div>
+              )}
+            </div>
           );
         })}
       </Card>
@@ -6790,11 +7093,127 @@ const REPORT_HTML = {
   `,
 };
 
+// Inline modal for scheduling a report's auto-generation cadence.
+const ScheduleReportModal = ({ report, existing, onSave, onClose }) => {
+  const [enabled, setEnabled] = useState(existing?.enabled ?? true);
+  const [cadence, setCadence] = useState(existing?.cadence || "monthly");
+  const [recipients, setRecipients] = useState(existing?.recipients || "board@ircchurch.org");
+  const [format, setFormat] = useState(existing?.format || (report?.formats?.[0] || "PDF"));
+  const canSave = enabled === false || (recipients.trim() && cadence);
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(10,10,10,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: COLORS.surface, borderRadius: 16, width: 540, maxWidth: "100%", boxShadow: "0 25px 80px rgba(0,0,0,0.6)", border: `1px solid ${COLORS.border}` }}>
+        <div style={{ padding: "22px 24px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Schedule report</div>
+            <div style={{ fontFamily: fontDisplay, fontSize: 19, fontWeight: 600, color: COLORS.ink, marginTop: 4 }}>{report?.name}</div>
+            <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 4, fontStyle: "italic" }}>
+              Auto-generates and emails the report on the cadence below.
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}><X size={18} color={COLORS.inkSoft} /></button>
+        </div>
+        <div style={{ padding: 22, display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <button
+              onClick={() => setEnabled(!enabled)}
+              style={{
+                width: 44, height: 24, borderRadius: 12, border: "none", cursor: "pointer",
+                backgroundColor: enabled ? COLORS.green : COLORS.border, position: "relative", transition: "background 0.15s",
+              }}
+              aria-label="Toggle schedule enabled"
+            >
+              <span style={{
+                position: "absolute", top: 2, left: enabled ? 22 : 2, width: 20, height: 20, borderRadius: "50%",
+                backgroundColor: COLORS.surface, transition: "left 0.15s", boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+              }} />
+            </button>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{enabled ? "Scheduled" : "Paused"}</div>
+              <div style={{ fontSize: 11, color: COLORS.inkSoft }}>
+                {enabled ? "This report will run automatically." : "Toggle on to resume the schedule."}
+              </div>
+            </div>
+          </div>
+
+          {enabled && (
+            <>
+              <div>
+                <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, marginBottom: 6 }}>Cadence</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {[
+                    { id: "daily",     label: "Daily" },
+                    { id: "weekly",    label: "Weekly · Monday" },
+                    { id: "monthly",   label: "Monthly · 1st" },
+                    { id: "quarterly", label: "Quarterly" },
+                    { id: "annually",  label: "Annually · Dec 31" },
+                  ].map((c) => (
+                    <button key={c.id} onClick={() => setCadence(c.id)} style={{
+                      padding: "7px 12px", border: cadence === c.id ? `2px solid ${COLORS.forest}` : `1px solid ${COLORS.border}`,
+                      borderRadius: 7, backgroundColor: cadence === c.id ? "rgba(212,255,0,0.06)" : "transparent",
+                      fontFamily: fontBody, fontWeight: 600, fontSize: 12, color: COLORS.ink, cursor: "pointer",
+                    }}>{c.label}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, marginBottom: 6 }}>Format</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {report?.formats?.map((f) => (
+                    <button key={f} onClick={() => setFormat(f)} style={{
+                      padding: "6px 12px", border: format === f ? `2px solid ${COLORS.forest}` : `1px solid ${COLORS.border}`,
+                      borderRadius: 6, backgroundColor: format === f ? "rgba(212,255,0,0.06)" : "transparent",
+                      fontFamily: fontBody, fontWeight: 700, fontSize: 11, color: COLORS.ink, cursor: "pointer",
+                      textTransform: "uppercase", letterSpacing: 0.4,
+                    }}>{f}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, marginBottom: 6 }}>Recipients</div>
+                <input
+                  value={recipients}
+                  onChange={(e) => setRecipients(e.target.value)}
+                  placeholder="board@ircchurch.org, finance@ircchurch.org"
+                  style={{
+                    width: "100%", padding: "10px 12px", fontSize: 13, fontFamily: fontBody, color: COLORS.ink,
+                    backgroundColor: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+                  }}
+                />
+                <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 4, fontStyle: "italic" }}>
+                  Comma-separated. Each gets a copy at the scheduled time.
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        <div style={{ padding: "16px 22px", borderTop: `1px solid ${COLORS.border}`, backgroundColor: COLORS.bg, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button onClick={onClose} style={{ padding: "10px 18px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody }}>Cancel</button>
+          <button onClick={() => onSave({ enabled, cadence, recipients, format })} disabled={!canSave} style={{
+            padding: "10px 22px", border: "none", borderRadius: 9,
+            backgroundColor: canSave ? COLORS.forest : COLORS.cream,
+            color: canSave ? ON_LIME : COLORS.inkSoft,
+            fontWeight: 700, fontSize: 13, cursor: canSave ? "pointer" : "not-allowed", fontFamily: fontBody,
+            display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <Check size={13} /> Save schedule
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ReportsPage = ({ campuses, ministries, recurringPayments }) => {
   const [period, setPeriod] = useState("ytd");
   const [campusFilter, setCampusFilter] = useState("all");
   const [scopes, setScopes] = useState({});
   const [generating, setGenerating] = useState(null);
+  const [scheduling, setScheduling] = useState(null); // report being scheduled
+  const [schedules, setSchedules] = useState({});      // { reportId: { enabled, cadence, recipients, format } }
 
   const periodLabel = PERIOD_OPTIONS.find((p) => p.id === period)?.label || period;
 
@@ -7016,12 +7435,17 @@ const ReportsPage = ({ campuses, ministries, recurringPayments }) => {
                 >
                   {pdfBusy ? <><RefreshCw size={12} style={{ animation: "spin 0.9s linear infinite" }} /> PDF…</> : <><FileText size={12} /> Print PDF</>}
                 </button>
-                <button style={{
-                  padding: "10px 12px", border: `1px solid ${COLORS.border}`, borderRadius: 9,
-                  backgroundColor: "transparent", color: COLORS.inkSoft,
-                  fontFamily: fontBody, fontWeight: 600, fontSize: 12, cursor: "pointer",
-                  display: "flex", alignItems: "center", gap: 5,
-                }} title="Schedule">
+                <button
+                  onClick={() => setScheduling(r)}
+                  title={schedules[r.id]?.enabled ? `Scheduled · ${schedules[r.id].cadence}` : "Schedule"}
+                  style={{
+                    padding: "10px 12px", border: `1px solid ${schedules[r.id]?.enabled ? COLORS.green + "60" : COLORS.border}`, borderRadius: 9,
+                    backgroundColor: schedules[r.id]?.enabled ? "rgba(74,222,128,0.06)" : "transparent",
+                    color: schedules[r.id]?.enabled ? COLORS.green : COLORS.inkSoft,
+                    fontFamily: fontBody, fontWeight: 600, fontSize: 12, cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 5,
+                  }}
+                >
                   <Clock size={12} />
                 </button>
               </div>
@@ -7063,6 +7487,18 @@ const ReportsPage = ({ campuses, ministries, recurringPayments }) => {
 
       {/* spinner keyframes */}
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+
+      {scheduling && (
+        <ScheduleReportModal
+          report={scheduling}
+          existing={schedules[scheduling.id]}
+          onSave={(cfg) => {
+            setSchedules((s) => ({ ...s, [scheduling.id]: cfg }));
+            setScheduling(null);
+          }}
+          onClose={() => setScheduling(null)}
+        />
+      )}
     </div>
   );
 };
@@ -7382,7 +7818,7 @@ function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
       case "receipts": return <ReceiptsPage openReceiptModal={open} />;
       case "activity": return <ActivityPage activityLog={activityLog} />;
       case "people": return <PeoplePage currentUser={currentUser} users={USERS} campuses={campuses} ministries={ministries} admins={admins} />;
-      case "integrations": return <IntegrationsPage campuses={campuses} />;
+      case "integrations": return <IntegrationsPage campuses={campuses} connections={connections} upsertConnection={upsertConnection} removeConnection={removeConnection} />;
       case "reports": return <ReportsPage campuses={campuses} ministries={ministries} recurringPayments={recurringPayments} />;
       case "settings": return <SettingsPage
         themeMode={themeMode} setThemeMode={setThemeMode} onSignOut={onExitDemo}
