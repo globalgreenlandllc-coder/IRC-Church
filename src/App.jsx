@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   LayoutDashboard, HandHeart, Receipt, Users, Building2, Calendar,
   FileText, Plug, Settings, Search, Bell, ChevronDown, Plus, Upload,
@@ -45,7 +45,7 @@ const THEME_LIGHT = {
   ink: "#0A0A0A",         // near-black text
   inkSoft: "#5C5C5C",     // medium gray
   forest: "#D4FF00",      // lime stays as bg
-  forestText: "#0A8E2E",  // deep grass-green for text (lime on cream is invisible)
+  forestText: "#0A0A0A",  // pure black for text in light mode — lime is invisible on cream, deep green is brand-mismatched
   forestDeep: "#000000",  // stays — sidebar + dark islands always dark
   copper: "#FF5A1F",      // orange stays
   copperSoft: "#FFB088",
@@ -176,6 +176,28 @@ const TEAM = [
   { name: "Marcus Tate", email: "marcus@ircchurch.org", role: "Tacoma Campus Pastor", access: "Campus Admin", avatar: "MT", lastActive: "30m ago", campus: "Tacoma" },
 ];
 
+// Three-tier role system. Each user has one role + a scope (campus / ministry).
+// HQ admins see everything; campus admins see their campus; ministry leaders see only their ministry.
+const ROLE_HQ = "hq_admin";
+const ROLE_CAMPUS = "campus_admin";
+const ROLE_MINISTRY = "ministry_leader";
+
+const ROLE_LABELS = {
+  [ROLE_HQ]: "HQ Admin",
+  [ROLE_CAMPUS]: "Campus Admin",
+  [ROLE_MINISTRY]: "Ministry Leader",
+};
+
+// Demo identities — switch between them via the role picker in the topbar.
+const USERS = [
+  { id: "u-vlad",   name: "Pastor Vladimir",  avatar: "PV", role: ROLE_HQ,       campusId: null,        ministryId: null,         title: "Senior Pastor · HQ" },
+  { id: "u-elena",  name: "Elena Volkov",     avatar: "EV", role: ROLE_HQ,       campusId: null,        ministryId: null,         title: "Treasurer · HQ Finance" },
+  { id: "u-marcus", name: "Marcus Tate",      avatar: "MT", role: ROLE_CAMPUS,   campusId: "tacoma",    ministryId: null,         title: "Tacoma Campus Pastor" },
+  { id: "u-james",  name: "James Chen",       avatar: "JC", role: ROLE_CAMPUS,   campusId: "brooklyn",  ministryId: null,         title: "Brooklyn Campus Pastor" },
+  { id: "u-anna",   name: "Anna Kovalenko",   avatar: "AK", role: ROLE_MINISTRY, campusId: "bellevue",  ministryId: "worship",    title: "Worship Leader · Bellevue" },
+  { id: "u-olga",   name: "Olga Smirnova",    avatar: "OS", role: ROLE_MINISTRY, campusId: "bellevue",  ministryId: "single-mom", title: "Single Moms Lead · Bellevue" },
+];
+
 // Campuses — single source of truth. Lifted to IRCChurchApp state.
 // Bellevue is HQ; Everett, Tacoma, Brooklyn are satellites.
 const INITIAL_CAMPUSES = [
@@ -212,6 +234,159 @@ const RECENT_RECEIPTS = [
   { id: 6, ministry: "Media", vendor: "Adobe", amount: 89.99, date: "2025-12-20", status: "synced", uploadedBy: "Lana V." },
   { id: 7, ministry: "Single Moms", vendor: "Walmart", amount: 425.66, date: "2025-12-19", status: "pending", uploadedBy: "Olga S." },
 ];
+
+// ============================================================
+// SMART BUDGET — annual mandatory + extras per campus, paid events
+// ============================================================
+
+const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+// Each campus has a 12-month plan: mandatory (must-pay) + extras (discretionary).
+// Mandatory mirrors recurring overhead; extras = ministry & outreach budget.
+const ANNUAL_BUDGETS = {
+  bellevue: {
+    mandatory: [78000, 78000, 78000, 78000, 78000, 79500, 79500, 79500, 81000, 81000, 81000, 83000],
+    extras:    [12500, 11000, 13500, 12000, 14000, 18000, 17500, 16000, 14500, 15500, 17000, 24000],
+    breakdown: {
+      mandatory: [
+        { label: "Rent & utilities", amount: 24000, color: "#FF5A1F" },
+        { label: "Payroll",          amount: 42000, color: "#D4FF00" },
+        { label: "Insurance + ops",  amount: 5800,  color: "#A78BFA" },
+        { label: "Mortgage",         amount: 7800,  color: "#22D3EE" },
+      ],
+      extras: [
+        { label: "Outreach campaigns",   amount: 5500, color: "#FF3B8A" },
+        { label: "Kids extras",          amount: 3200, color: "#22D3EE" },
+        { label: "Building improvements",amount: 4000, color: "#FBBF24" },
+        { label: "Blessings & care",     amount: 1300, color: "#FF5A1F" },
+      ],
+    },
+  },
+  everett: {
+    mandatory: [8000, 8000, 8000, 8000, 8000, 8200, 8200, 8200, 8400, 8400, 8400, 8600],
+    extras:    [1300, 1300, 1500, 1400, 1300, 2200, 2400, 2400, 1800, 2000, 2200, 3000],
+    breakdown: {
+      mandatory: [
+        { label: "Rent",        amount: 4800, color: "#FF5A1F" },
+        { label: "Utilities",   amount: 1200, color: "#A78BFA" },
+        { label: "Local staff", amount: 2000, color: "#D4FF00" },
+      ],
+      extras: [
+        { label: "Outreach",     amount: 800, color: "#FF3B8A" },
+        { label: "Local events", amount: 500, color: "#FBBF24" },
+      ],
+    },
+  },
+  tacoma: {
+    mandatory: [4200, 4200, 4200, 4200, 4200, 4200, 4200, 4200, 4400, 4400, 4400, 4400],
+    extras:    [800,  800,  900,  800,  900,  1400, 1500, 1500, 1100, 1100, 1300, 1900],
+    breakdown: {
+      mandatory: [
+        { label: "Rent",      amount: 4200, color: "#FF5A1F" },
+      ],
+      extras: [
+        { label: "Outreach",   amount: 600, color: "#FF3B8A" },
+        { label: "Youth costs",amount: 300, color: "#22D3EE" },
+      ],
+    },
+  },
+  brooklyn: {
+    mandatory: [5800, 5800, 5800, 5800, 5800, 5800, 5800, 5800, 6000, 6000, 6000, 6000],
+    extras:    [900,  900,  1000, 900,  1000, 1600, 1700, 1700, 1200, 1200, 1400, 2100],
+    breakdown: {
+      mandatory: [
+        { label: "Rent", amount: 5800, color: "#FF5A1F" },
+      ],
+      extras: [
+        { label: "Outreach", amount: 700, color: "#FF3B8A" },
+        { label: "Events",   amount: 300, color: "#FBBF24" },
+      ],
+    },
+  },
+};
+
+// Donations per month per campus — actuals through last month, projections after.
+// Demo "today" = May 11, 2026 → Jan-Apr are actuals; May-onward are projected.
+const MONTHLY_DONATIONS = {
+  bellevue: [122000, 118000, 134000, 142000, 128000, 138000, 134000, 132000, 144000, 148000, 142000, 215000],
+  everett:  [11500,  10800,  11900,  12500,  12000,  13000,  12500,  12200,  13500,  13800,  13500,  20500],
+  tacoma:   [5400,   5100,   5700,   6000,   5800,   6300,   6100,   5900,   6500,   6700,   6500,   9800],
+  brooklyn: [7800,   7400,   8200,   8600,   8400,   9000,   8800,   8600,   9400,   9700,   9400,  14200],
+};
+
+// Demo "now" month index (May = 4, zero-indexed).
+const CURRENT_MONTH_IDX = 4;
+
+// Paid events with break-even math.
+const PAID_EVENTS = [
+  { id: "youth-camp",      campusId: "bellevue", name: "Youth Summer Camp",      date: "Jul 15–22, 2026", budget: 14500, ticketPrice: 250, expectedAttendees: 60, paidRegistrations: 42, scholarships: 6, notes: "Sliding-scale for 6 students" },
+  { id: "vbs",             campusId: "bellevue", name: "Vacation Bible School",  date: "Jun 22, 2026",    budget: 4000,  ticketPrice: 40,  expectedAttendees: 85, paidRegistrations: 72, scholarships: 4, notes: "Strong demand" },
+  { id: "mens-retreat",    campusId: "bellevue", name: "Men's Retreat",          date: "Sep 12–13, 2026", budget: 8500,  ticketPrice: 145, expectedAttendees: 70, paidRegistrations: 38, scholarships: 0, notes: "Speakers locked" },
+  { id: "womens-conf",     campusId: "everett",  name: "Women's Conference",     date: "Oct 17, 2026",    budget: 2800,  ticketPrice: 45,  expectedAttendees: 75, paidRegistrations: 52, scholarships: 3, notes: "" },
+  { id: "kids-fall-party", campusId: "brooklyn", name: "Brooklyn Kids Fall Party", date: "Oct 25, 2026",  budget: 1800,  ticketPrice: 25,  expectedAttendees: 50, paidRegistrations: 11, scholarships: 2, notes: "Slow ticket sales" },
+];
+
+// ----- COVERAGE COMPUTATIONS -----
+
+// For a given campus + month index, return the smart coverage signal.
+function getMonthCoverage(campusId, monthIdx) {
+  const b = ANNUAL_BUDGETS[campusId];
+  const d = MONTHLY_DONATIONS[campusId];
+  if (!b || !d) return null;
+  const mandatory = b.mandatory[monthIdx] || 0;
+  const extras = b.extras[monthIdx] || 0;
+  const donations = d[monthIdx] || 0;
+  const total = mandatory + extras;
+  const surplus = donations - total;       // positive = fully covered + buffer
+  const deficit = mandatory - donations;   // positive = mandatory at risk
+  const extrasAvailable = Math.max(0, donations - mandatory);
+  const extrasShortfall = Math.max(0, extras - extrasAvailable);
+  const isActual = monthIdx < CURRENT_MONTH_IDX;
+  // Status levels: good = fully covered with buffer; ok = covered exactly;
+  // warn = mandatory ok but extras short; danger = mandatory at risk.
+  let level, status;
+  if (donations < mandatory) {
+    level = "danger"; status = isActual ? "Mandatory missed" : "Mandatory at risk";
+  } else if (extrasAvailable < extras) {
+    level = "warn"; status = "Partial extras";
+  } else {
+    level = "good"; status = "Fully covered";
+  }
+  return { mandatory, extras, donations, total, surplus, deficit, extrasAvailable, extrasShortfall, level, status, isActual };
+}
+
+// Per-event break-even math.
+function getEventCoverage(event) {
+  const revenueCurrent = event.paidRegistrations * event.ticketPrice;
+  const revenueMax = (event.expectedAttendees - event.scholarships) * event.ticketPrice;
+  const breakEvenAttendees = Math.ceil(event.budget / event.ticketPrice);
+  const needed = Math.max(0, breakEvenAttendees - event.paidRegistrations);
+  const salesPct = event.paidRegistrations / event.expectedAttendees;
+  const netCurrent = revenueCurrent - event.budget;
+  const netMax = revenueMax - event.budget;
+  let level, status;
+  if (netMax < 0) {
+    level = "danger"; status = "Can't break even at current capacity";
+  } else if (netCurrent < 0 && salesPct < 0.7) {
+    level = "danger"; status = "At risk";
+  } else if (netCurrent < 0) {
+    level = "warn"; status = "On track to break even";
+  } else {
+    level = "good"; status = "Breaking even";
+  }
+  return { revenueCurrent, revenueMax, breakEvenAttendees, needed, salesPct, netCurrent, netMax, level, status };
+}
+
+// Aggregate full-year coverage for a campus.
+function getYearCoverage(campusId) {
+  const months = MONTH_LABELS.map((_, i) => ({ label: MONTH_LABELS[i], idx: i, ...getMonthCoverage(campusId, i) }));
+  const totalMandatory = months.reduce((s, m) => s + (m?.mandatory || 0), 0);
+  const totalExtras = months.reduce((s, m) => s + (m?.extras || 0), 0);
+  const totalDonations = months.reduce((s, m) => s + (m?.donations || 0), 0);
+  const monthsCovered = months.filter((m) => m?.level === "good").length;
+  const monthsAtRisk = months.filter((m) => m?.level === "danger").length;
+  return { months, totalMandatory, totalExtras, totalDonations, monthsCovered, monthsAtRisk };
+}
 
 const MONTHLY_TREND = [
   { month: "Jan", donations: 142500, expenses: 128400 },
@@ -567,24 +742,32 @@ const Card = ({ children, style = {}, className = "" }) => (
 // SIDEBAR
 // ============================================================
 
-const Sidebar = ({ activePage, setActivePage }) => {
-  const items = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "donations", label: "Donations", icon: HandHeart },
-    { id: "expenses", label: "Expenses", icon: Receipt },
-    { id: "budget", label: "Budget", icon: Target },
-    { id: "calendar", label: "Calendar", icon: CalendarDays },
-    { id: "ministries", label: "Ministries", icon: Users },
-    { id: "campuses", label: "Campuses", icon: Building2 },
-    { id: "administrators", label: "Administrators", icon: UserPlus },
-    { id: "events", label: "Events & Camps", icon: Calendar },
-    { id: "receipts", label: "Receipts", icon: Paperclip },
-    { id: "activity", label: "Activity", icon: Activity },
-    { id: "people", label: "People & Roles", icon: Shield },
-    { id: "integrations", label: "Integrations", icon: Plug },
-    { id: "reports", label: "Reports", icon: FileText },
-    { id: "settings", label: "Settings", icon: Settings },
-  ];
+// Each sidebar item declares which roles see it. Undefined = all roles.
+const SIDEBAR_ITEMS = [
+  { id: "dashboard",     label: "Dashboard",       icon: LayoutDashboard, roles: [ROLE_HQ, ROLE_CAMPUS, ROLE_MINISTRY] },
+  { id: "donations",     label: "Donations",       icon: HandHeart,       roles: [ROLE_HQ, ROLE_CAMPUS] },
+  { id: "expenses",      label: "Expenses",        icon: Receipt,         roles: [ROLE_HQ, ROLE_CAMPUS] },
+  { id: "budget",        label: "Budget",          icon: Target,          roles: [ROLE_HQ, ROLE_CAMPUS, ROLE_MINISTRY] },
+  { id: "smart",         label: "Smart Budget",    icon: Gauge,           roles: [ROLE_HQ, ROLE_CAMPUS, ROLE_MINISTRY] },
+  { id: "calendar",      label: "Calendar",        icon: CalendarDays,    roles: [ROLE_HQ, ROLE_CAMPUS] },
+  { id: "ministries",    label: "Ministries",      icon: Users,           roles: [ROLE_HQ, ROLE_CAMPUS] },
+  { id: "campuses",      label: "Campuses",        icon: Building2,       roles: [ROLE_HQ] },
+  { id: "administrators",label: "Administrators",  icon: UserPlus,        roles: [ROLE_HQ] },
+  { id: "events",        label: "Events & Camps",  icon: Calendar,        roles: [ROLE_HQ, ROLE_CAMPUS] },
+  { id: "receipts",      label: "Receipts",        icon: Paperclip,       roles: [ROLE_HQ, ROLE_CAMPUS, ROLE_MINISTRY] },
+  { id: "activity",      label: "Activity",        icon: Activity,        roles: [ROLE_HQ, ROLE_CAMPUS] },
+  { id: "people",        label: "People & Roles",  icon: Shield,          roles: [ROLE_HQ, ROLE_CAMPUS, ROLE_MINISTRY] },
+  { id: "integrations",  label: "Integrations",    icon: Plug,            roles: [ROLE_HQ] },
+  { id: "reports",       label: "Reports",         icon: FileText,        roles: [ROLE_HQ, ROLE_CAMPUS] },
+  { id: "settings",      label: "Settings",        icon: Settings,        roles: [ROLE_HQ, ROLE_CAMPUS, ROLE_MINISTRY] },
+];
+
+// Resolve which sidebar items a given role can see.
+const sidebarItemsForRole = (role) =>
+  SIDEBAR_ITEMS.filter((it) => !it.roles || it.roles.includes(role));
+
+const Sidebar = ({ activePage, setActivePage, currentUser }) => {
+  const items = sidebarItemsForRole(currentUser?.role || ROLE_HQ);
 
   return (
     <aside style={{
@@ -650,8 +833,10 @@ const Sidebar = ({ activePage, setActivePage }) => {
 // TOP BAR
 // ============================================================
 
-const TopBar = ({ activeCampus, setActiveCampus, pageTitle, pageSubtitle, campuses: campusesData }) => {
+const TopBar = ({ activeCampus, setActiveCampus, pageTitle, pageSubtitle, campuses: campusesData, currentUser, setCurrentUser, users }) => {
   const [campusOpen, setCampusOpen] = useState(false);
+  const [userOpen, setUserOpen] = useState(false);
+  const isHQ = currentUser?.role === ROLE_HQ;
   const campuses = [
     { id: "all", name: "All Campuses", desc: "Consolidated view" },
     ...campusesData.map((c) => ({
@@ -661,6 +846,8 @@ const TopBar = ({ activeCampus, setActiveCampus, pageTitle, pageSubtitle, campus
     })),
   ];
   const current = campuses.find((c) => c.id === activeCampus) || campuses[0];
+
+  const roleColor = currentUser?.role === ROLE_HQ ? COLORS.forest : currentUser?.role === ROLE_CAMPUS ? COLORS.copper : COLORS.amber;
 
   return (
     <div style={{
@@ -687,13 +874,76 @@ const TopBar = ({ activeCampus, setActiveCampus, pageTitle, pageSubtitle, campus
           />
         </div>
 
+        {/* ROLE SWITCHER (demo affordance) */}
+        {users && currentUser && (
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => setUserOpen(!userOpen)}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "7px 12px",
+                backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`,
+                borderRadius: 10, cursor: "pointer", fontFamily: fontBody, fontSize: 12, fontWeight: 600
+              }}
+            >
+              <span style={{ width: 24, height: 24, borderRadius: "50%", backgroundColor: roleColor, color: textOnBg(roleColor), display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 10, fontFamily: fontDisplay }}>
+                {currentUser.avatar}
+              </span>
+              <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.1 }}>
+                <span>{currentUser.name}</span>
+                <span style={{ fontSize: 9, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>
+                  {ROLE_LABELS[currentUser.role]}
+                </span>
+              </span>
+              <ChevronDown size={12} />
+            </button>
+            {userOpen && (
+              <div style={{
+                position: "absolute", top: "calc(100% + 6px)", right: 0, width: 280, zIndex: 30,
+                backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 12,
+                padding: 6, boxShadow: "0 10px 40px rgba(0,0,0,0.25)",
+              }}>
+                <div style={{ padding: "8px 12px", fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>
+                  View as · demo
+                </div>
+                {users.map((u) => {
+                  const active = u.id === currentUser.id;
+                  const c = u.role === ROLE_HQ ? COLORS.forest : u.role === ROLE_CAMPUS ? COLORS.copper : COLORS.amber;
+                  return (
+                    <button
+                      key={u.id}
+                      onClick={() => { setCurrentUser(u); setUserOpen(false); }}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
+                        padding: "8px 10px", border: "none", borderRadius: 8, cursor: "pointer",
+                        backgroundColor: active ? COLORS.cream : "transparent", fontFamily: fontBody,
+                      }}
+                    >
+                      <span style={{ width: 28, height: 28, borderRadius: "50%", backgroundColor: c, color: textOnBg(c), display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 11, fontFamily: fontDisplay, flexShrink: 0 }}>
+                        {u.avatar}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.ink }}>{u.name}</div>
+                        <div style={{ fontSize: 10, color: COLORS.inkSoft }}>{u.title}</div>
+                      </div>
+                      {active && <Check size={13} color={COLORS.forestText} />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         <div style={{ position: "relative" }}>
           <button
-            onClick={() => setCampusOpen(!campusOpen)}
+            onClick={() => isHQ && setCampusOpen(!campusOpen)}
+            disabled={!isHQ}
+            title={isHQ ? "" : "Campus is locked to your assignment"}
             style={{
               display: "flex", alignItems: "center", gap: 10, padding: "9px 14px",
               backgroundColor: COLORS.forest, color: ON_LIME, border: "none",
-              borderRadius: 10, cursor: "pointer", fontFamily: fontBody, fontSize: 13, fontWeight: 600
+              borderRadius: 10, cursor: isHQ ? "pointer" : "not-allowed", fontFamily: fontBody, fontSize: 13, fontWeight: 600,
+              opacity: isHQ ? 1 : 0.7,
             }}
           >
             <MapPin size={14} />
@@ -2303,7 +2553,622 @@ const WhatIfScenarioSection = ({ ministries, updateMinistryBudget, logActivity, 
 // BUDGET PAGE
 // ============================================================
 
-const BudgetPage = ({ ministries, updateMinistryBudget, logActivity, recurringPayments, operatingOverheadMo, survivalFloorMo }) => {
+// Banner that explains how this campus's budget is funded.
+// ============================================================
+// SMART BUDGET COMPONENTS — mandatory vs extras watchdog,
+// event break-even monitor, annual planner.
+// ============================================================
+
+// Theme-aware level color helper. Returns text/bg/border for a status level.
+// Called inside JSX (not at module load) so the proxy reads the current theme.
+const levelTone = (level) => {
+  const map = {
+    good:   { text: COLORS.green, bg: "rgba(74,222,128,0.10)", border: COLORS.green },
+    warn:   { text: COLORS.amber, bg: "rgba(251,191,36,0.10)", border: COLORS.amber },
+    danger: { text: COLORS.red,   bg: "rgba(255,59,138,0.10)", border: COLORS.red },
+  };
+  return map[level] || map.good;
+};
+
+const YearCoverageStrip = ({ campusId, selectedMonth, onPickMonth }) => {
+  const year = getYearCoverage(campusId);
+  return (
+    <Card style={{ padding: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Year at a glance · 2026</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 16, fontWeight: 600, color: COLORS.ink, marginTop: 2 }}>
+            {year.monthsCovered} months fully covered · {year.monthsAtRisk} at risk
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 12, fontSize: 11 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: COLORS.green }} /> Covered</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: COLORS.amber }} /> Partial</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: COLORS.red }} /> At risk</span>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 6 }}>
+        {year.months.map((m) => {
+          const tone = levelTone(m.level);
+          const sel = selectedMonth === m.idx;
+          const isNow = m.idx === CURRENT_MONTH_IDX;
+          return (
+            <button
+              key={m.idx}
+              onClick={() => onPickMonth(m.idx)}
+              style={{
+                padding: 10, borderRadius: 8, cursor: "pointer", fontFamily: fontBody, textAlign: "center",
+                border: sel ? `2px solid ${COLORS.copper}` : `1px solid ${COLORS.border}`,
+                backgroundColor: sel ? "rgba(255,90,31,0.06)" : tone.bg,
+                position: "relative",
+              }}
+            >
+              {isNow && (
+                <span style={{ position: "absolute", top: -7, left: "50%", transform: "translateX(-50%)", padding: "1px 6px", borderRadius: 99, backgroundColor: COLORS.copper, color: "#fff", fontSize: 9, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>
+                  Now
+                </span>
+              )}
+              <div style={{ fontSize: 11, color: COLORS.inkSoft, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.4 }}>{m.label}</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, marginTop: 4 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: tone.text }} />
+                <span style={{ fontFamily: fontDisplay, fontSize: 14, fontWeight: 700, color: COLORS.ink, fontVariantNumeric: "tabular-nums" }}>
+                  {fmtShort(m.donations)}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </Card>
+  );
+};
+
+const MandatoryVsExtrasCard = ({ campusId, monthIdx }) => {
+  const cov = getMonthCoverage(campusId, monthIdx);
+  if (!cov) return null;
+  const b = ANNUAL_BUDGETS[campusId];
+  const mTone = cov.donations >= cov.mandatory ? "good" : "danger";
+  const eTone = cov.extrasShortfall === 0 ? "good" : cov.extrasAvailable > 0 ? "warn" : "danger";
+  const mandatoryPct = Math.min(100, (cov.donations / cov.mandatory) * 100);
+  const extrasPct = Math.min(100, (cov.extrasAvailable / cov.extras) * 100);
+
+  return (
+    <Card style={{ padding: 22 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div>
+          <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>
+            {MONTH_LABELS[monthIdx]} 2026 · coverage
+          </div>
+          <div style={{ fontFamily: fontSerif, fontSize: 22, fontStyle: "italic", color: COLORS.ink, marginTop: 4, letterSpacing: -0.3 }}>
+            Mandatory vs extras.
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Donations</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 700, color: COLORS.ink, letterSpacing: -0.5 }}>{fmtShort(cov.donations)}</div>
+          <div style={{ fontSize: 10, color: COLORS.inkSoft, fontStyle: "italic" }}>
+            {cov.isActual ? "actual" : "projected"}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {/* MANDATORY */}
+        <div style={{ padding: 16, borderRadius: 11, border: `1px solid ${levelTone(mTone).border}40`, backgroundColor: levelTone(mTone).bg }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <span style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Mandatory min</span>
+            <Pill tone={mTone === "good" ? "success" : "danger"}>{mTone === "good" ? "Covered" : "At risk"}</Pill>
+          </div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 26, fontWeight: 700, color: COLORS.ink, letterSpacing: -0.5 }}>{fmtShort(cov.mandatory)}</div>
+          <div style={{ height: 8, backgroundColor: COLORS.cream, borderRadius: 99, overflow: "hidden", margin: "10px 0 6px" }}>
+            <div style={{ height: "100%", width: `${mandatoryPct}%`, backgroundColor: levelTone(mTone).text, transition: "width 0.3s" }} />
+          </div>
+          <div style={{ fontSize: 12, color: levelTone(mTone).text, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+            {Math.round(mandatoryPct)}% covered
+            {mTone === "good" && cov.surplus > 0 && <span style={{ color: COLORS.inkSoft, fontWeight: 500 }}> · +{fmtShort(cov.surplus)} buffer</span>}
+            {mTone === "danger" && <span style={{ color: COLORS.inkSoft, fontWeight: 500 }}> · −{fmtShort(cov.deficit)} short</span>}
+          </div>
+          <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${COLORS.borderSoft}`, display: "flex", flexDirection: "column", gap: 5 }}>
+            {b.breakdown.mandatory.map((row, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: row.color }} />
+                <span style={{ flex: 1, color: COLORS.inkSoft }}>{row.label}</span>
+                <span style={{ color: COLORS.ink, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtShort(row.amount)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* EXTRAS */}
+        <div style={{ padding: 16, borderRadius: 11, border: `1px solid ${levelTone(eTone).border}40`, backgroundColor: levelTone(eTone).bg }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <span style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Extras</span>
+            <Pill tone={eTone === "good" ? "success" : eTone === "warn" ? "warn" : "danger"}>
+              {eTone === "good" ? "Funded" : eTone === "warn" ? "Partial" : "No room"}
+            </Pill>
+          </div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 26, fontWeight: 700, color: COLORS.ink, letterSpacing: -0.5 }}>{fmtShort(cov.extras)}</div>
+          <div style={{ height: 8, backgroundColor: COLORS.cream, borderRadius: 99, overflow: "hidden", margin: "10px 0 6px" }}>
+            <div style={{ height: "100%", width: `${extrasPct}%`, backgroundColor: levelTone(eTone).text, transition: "width 0.3s" }} />
+          </div>
+          <div style={{ fontSize: 12, color: levelTone(eTone).text, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+            {fmtShort(cov.extrasAvailable)} of {fmtShort(cov.extras)} available
+            {cov.extrasShortfall > 0 && <span style={{ color: COLORS.inkSoft, fontWeight: 500 }}> · −{fmtShort(cov.extrasShortfall)} short</span>}
+          </div>
+          <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${COLORS.borderSoft}`, display: "flex", flexDirection: "column", gap: 5 }}>
+            {b.breakdown.extras.map((row, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: row.color }} />
+                <span style={{ flex: 1, color: COLORS.inkSoft }}>{row.label}</span>
+                <span style={{ color: COLORS.ink, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtShort(row.amount)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
+const SmartWarningBanner = ({ campusId, monthIdx }) => {
+  const cov = getMonthCoverage(campusId, monthIdx);
+  if (!cov || cov.level === "good") return null;
+
+  const isDanger = cov.level === "danger";
+  const tone = levelTone(cov.level);
+  const advice = isDanger
+    ? `You need ${fmtShort(cov.deficit)} more in donations to cover ${MONTH_LABELS[monthIdx]}'s mandatory minimum. Pause extras, run an outreach, or tap reserves.`
+    : `Mandatory is covered, but extras have a ${fmtShort(cov.extrasShortfall)} shortfall. Consider pausing some extras — or wait, late-month giving usually adds 18-23% of the total.`;
+
+  return (
+    <Card style={{ padding: 16, backgroundColor: tone.bg, borderColor: tone.border + "60", display: "flex", alignItems: "center", gap: 14 }}>
+      <div style={{ width: 36, height: 36, borderRadius: 9, backgroundColor: tone.border, color: isDanger ? ON_PINK : ON_AMBER, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <AlertTriangle size={18} />
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 11, color: tone.text, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>{cov.status}</div>
+        <div style={{ fontFamily: fontSerif, fontSize: 17, fontStyle: "italic", color: COLORS.ink, marginTop: 4, lineHeight: 1.35 }}>
+          {advice}
+        </div>
+      </div>
+    </Card>
+  );
+};
+
+const EventBudgetCard = ({ event, campus }) => {
+  const cov = getEventCoverage(event);
+  const tone = levelTone(cov.level);
+  const breakEvenPct = (event.paidRegistrations / cov.breakEvenAttendees) * 100;
+
+  return (
+    <Card style={{ padding: 20, position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 4, backgroundColor: tone.border }} />
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <Pill tone={cov.level === "good" ? "success" : cov.level === "warn" ? "warn" : "danger"}>{cov.status}</Pill>
+            {campus && <Pill tone="neutral">{campus.name}</Pill>}
+          </div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 700, color: COLORS.ink }}>{event.name}</div>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>{event.date} · ticket ${event.ticketPrice}</div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Net (current)</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 700, color: cov.netCurrent >= 0 ? COLORS.green : COLORS.red, letterSpacing: -0.4 }}>
+            {cov.netCurrent >= 0 ? "+" : "−"}{fmtShort(Math.abs(cov.netCurrent))}
+          </div>
+          <div style={{ fontSize: 10, color: COLORS.inkSoft, fontStyle: "italic" }}>max possible {fmtShort(cov.netMax)}</div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Budget</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 15, fontWeight: 700, color: COLORS.ink, marginTop: 2 }}>{fmtShort(event.budget)}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Sold</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 15, fontWeight: 700, color: COLORS.ink, marginTop: 2 }}>{event.paidRegistrations}/{event.expectedAttendees}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Break-even</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 15, fontWeight: 700, color: COLORS.ink, marginTop: 2 }}>{cov.breakEvenAttendees}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Need</div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 15, fontWeight: 700, color: cov.needed > 0 ? COLORS.copper : COLORS.green, marginTop: 2 }}>
+            {cov.needed > 0 ? `+${cov.needed}` : "✓"}
+          </div>
+        </div>
+      </div>
+
+      {/* break-even bar */}
+      <div style={{ position: "relative", height: 10, backgroundColor: COLORS.cream, borderRadius: 99, overflow: "hidden", marginBottom: 4 }}>
+        <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: `${Math.min(100, breakEvenPct)}%`, backgroundColor: tone.text, transition: "width 0.3s" }} />
+        <div style={{ position: "absolute", top: -2, bottom: -2, left: "100%", width: 2, backgroundColor: COLORS.ink, transform: "translateX(-1px)" }} title="Break-even point" />
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: COLORS.inkSoft, fontWeight: 600 }}>
+        <span>{event.paidRegistrations} sold</span>
+        <span>{cov.breakEvenAttendees} needed to break even</span>
+      </div>
+
+      {event.notes && (
+        <div style={{ marginTop: 12, padding: 10, borderRadius: 7, backgroundColor: COLORS.bg, border: `1px solid ${COLORS.borderSoft}`, fontSize: 11, color: COLORS.inkSoft, fontStyle: "italic" }}>
+          {event.notes}
+        </div>
+      )}
+    </Card>
+  );
+};
+
+const EventsCoverageMonitor = ({ campuses, scopeCampusId }) => {
+  // Filter events by campus if a specific scope is passed.
+  const events = scopeCampusId && scopeCampusId !== "all"
+    ? PAID_EVENTS.filter((e) => e.campusId === scopeCampusId)
+    : PAID_EVENTS;
+  // Sort by risk: danger first, then warn, then good.
+  const sortKey = { danger: 0, warn: 1, good: 2 };
+  const sorted = [...events].sort((a, b) => sortKey[getEventCoverage(a).level] - sortKey[getEventCoverage(b).level]);
+
+  if (sorted.length === 0) {
+    return (
+      <Card style={{ padding: 22, textAlign: "center" }}>
+        <div style={{ fontFamily: fontSerif, fontSize: 17, fontStyle: "italic", color: COLORS.inkSoft }}>No paid events scheduled for this campus.</div>
+      </Card>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+        <div>
+          <div style={{ fontFamily: fontSerif, fontSize: 22, fontStyle: "italic", color: COLORS.ink, letterSpacing: -0.3 }}>
+            Paid events · break-even watchdog.
+          </div>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 4 }}>
+            Revenue must cover budget. Sorted by risk — most exposed first.
+          </div>
+        </div>
+        <div style={{ fontSize: 12, color: COLORS.inkSoft }}>
+          {sorted.length} event{sorted.length === 1 ? "" : "s"}
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+        {sorted.map((e) => (
+          <EventBudgetCard key={e.id} event={e} campus={campuses.find((c) => c.id === e.campusId)} />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const AnnualBudgetPlanner = ({ campusId, currentUser }) => {
+  const [view, setView] = useState("annual"); // "annual" | "grid"
+  // Local editable drafts initialized from data.
+  const b = ANNUAL_BUDGETS[campusId];
+  if (!b) return null;
+  const annualMandatory = b.mandatory.reduce((s, v) => s + v, 0);
+  const annualExtras = b.extras.reduce((s, v) => s + v, 0);
+  const [annualM, setAnnualM] = useState(annualMandatory);
+  const [annualE, setAnnualE] = useState(annualExtras);
+  const [distribution, setDistribution] = useState("even"); // "even" | "seasonal"
+  const [monthly, setMonthly] = useState({ mandatory: [...b.mandatory], extras: [...b.extras] });
+  const canEdit = currentUser?.role === ROLE_HQ || currentUser?.role === ROLE_CAMPUS;
+
+  // Seasonal weights — heavier in winter (heating) and December (Christmas giving).
+  const SEASONAL_M = [1.0, 1.0, 1.0, 1.0, 1.0, 1.02, 1.02, 1.02, 1.04, 1.04, 1.04, 1.06];
+  const SEASONAL_E = [0.85, 0.75, 0.92, 0.82, 0.95, 1.23, 1.20, 1.10, 1.00, 1.06, 1.16, 1.65];
+
+  const distribute = (total, weights) => {
+    const sumW = weights.reduce((s, w) => s + w, 0);
+    return weights.map((w) => Math.round((total * w / sumW) / 100) * 100);
+  };
+  const projectedMandatory = distribution === "seasonal" ? distribute(annualM, SEASONAL_M) : Array(12).fill(Math.round(annualM / 12 / 100) * 100);
+  const projectedExtras = distribution === "seasonal" ? distribute(annualE, SEASONAL_E) : Array(12).fill(Math.round(annualE / 12 / 100) * 100);
+
+  return (
+    <Card style={{ padding: 22 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Annual planner · 2026</div>
+          <div style={{ fontFamily: fontSerif, fontSize: 22, fontStyle: "italic", color: COLORS.ink, marginTop: 4, letterSpacing: -0.3 }}>
+            Set the year, edit any month.
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 4, padding: 4, backgroundColor: COLORS.cream, borderRadius: 99, border: `1px solid ${COLORS.border}` }}>
+          <button onClick={() => setView("annual")} style={{
+            padding: "6px 14px", borderRadius: 99, border: "none", fontFamily: fontBody, fontWeight: 700, fontSize: 11, cursor: "pointer",
+            backgroundColor: view === "annual" ? COLORS.surface : "transparent",
+            color: view === "annual" ? COLORS.ink : COLORS.inkSoft,
+            boxShadow: view === "annual" ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+          }}>Annual total</button>
+          <button onClick={() => setView("grid")} style={{
+            padding: "6px 14px", borderRadius: 99, border: "none", fontFamily: fontBody, fontWeight: 700, fontSize: 11, cursor: "pointer",
+            backgroundColor: view === "grid" ? COLORS.surface : "transparent",
+            color: view === "grid" ? COLORS.ink : COLORS.inkSoft,
+            boxShadow: view === "grid" ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+          }}>12-month grid</button>
+        </div>
+      </div>
+
+      {view === "annual" ? (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
+            <div style={{ padding: 14, borderRadius: 10, border: `1px solid ${COLORS.border}` }}>
+              <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Annual mandatory</div>
+              <input
+                type="number" value={annualM} disabled={!canEdit}
+                onChange={(e) => setAnnualM(Number(e.target.value))}
+                style={{ width: "100%", marginTop: 8, padding: "8px 10px", fontSize: 22, fontFamily: fontDisplay, fontWeight: 700, color: COLORS.ink, backgroundColor: canEdit ? COLORS.bg : COLORS.cream, border: `1px solid ${COLORS.border}`, borderRadius: 7, outline: "none", boxSizing: "border-box", fontVariantNumeric: "tabular-nums" }}
+              />
+              <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 4 }}>≈ {fmtShort(Math.round(annualM / 12))}/mo on average</div>
+            </div>
+            <div style={{ padding: 14, borderRadius: 10, border: `1px solid ${COLORS.border}` }}>
+              <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>Annual extras</div>
+              <input
+                type="number" value={annualE} disabled={!canEdit}
+                onChange={(e) => setAnnualE(Number(e.target.value))}
+                style={{ width: "100%", marginTop: 8, padding: "8px 10px", fontSize: 22, fontFamily: fontDisplay, fontWeight: 700, color: COLORS.ink, backgroundColor: canEdit ? COLORS.bg : COLORS.cream, border: `1px solid ${COLORS.border}`, borderRadius: 7, outline: "none", boxSizing: "border-box", fontVariantNumeric: "tabular-nums" }}
+              />
+              <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 4 }}>≈ {fmtShort(Math.round(annualE / 12))}/mo on average</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <span style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Distribution</span>
+            <div style={{ display: "flex", gap: 4 }}>
+              {[{ id: "even", label: "Even months" }, { id: "seasonal", label: "Seasonal weights" }].map((opt) => (
+                <button key={opt.id} onClick={() => setDistribution(opt.id)} disabled={!canEdit} style={{
+                  padding: "5px 10px", border: distribution === opt.id ? `2px solid ${COLORS.forest}` : `1px solid ${COLORS.border}`,
+                  borderRadius: 6, fontFamily: fontBody, fontWeight: 600, fontSize: 11, cursor: canEdit ? "pointer" : "not-allowed",
+                  backgroundColor: distribution === opt.id ? "rgba(212,255,0,0.08)" : "transparent", color: COLORS.ink,
+                }}>{opt.label}</button>
+              ))}
+            </div>
+          </div>
+          {/* Live preview stacked bars */}
+          <div style={{ padding: 14, borderRadius: 10, backgroundColor: COLORS.bg }}>
+            <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, marginBottom: 8 }}>Live preview — monthly spread</div>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 80 }}>
+              {MONTH_LABELS.map((m, i) => {
+                const mAmt = projectedMandatory[i];
+                const eAmt = projectedExtras[i];
+                const maxTotal = Math.max(...projectedMandatory.map((mm, j) => mm + projectedExtras[j]));
+                const mh = (mAmt / maxTotal) * 100;
+                const eh = (eAmt / maxTotal) * 100;
+                return (
+                  <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                    <div style={{ width: "100%", display: "flex", flexDirection: "column-reverse", height: "100%" }}>
+                      <div style={{ width: "100%", height: `${mh}%`, backgroundColor: COLORS.forest, borderRadius: "0 0 3px 3px" }} title={`Mandatory: ${fmtShort(mAmt)}`} />
+                      <div style={{ width: "100%", height: `${eh}%`, backgroundColor: COLORS.copper, borderRadius: "3px 3px 0 0", marginBottom: 1 }} title={`Extras: ${fmtShort(eAmt)}`} />
+                    </div>
+                    <span style={{ fontSize: 9, color: COLORS.inkSoft, fontWeight: 600 }}>{m}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 14, marginTop: 10, fontSize: 11 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: COLORS.forest }} />Mandatory</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: COLORS.copper }} />Extras</span>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left", padding: "8px 10px", fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, borderBottom: `1px solid ${COLORS.border}` }}>Row</th>
+                {MONTH_LABELS.map((m, i) => (
+                  <th key={i} style={{ padding: "8px 6px", fontSize: 10, color: i === CURRENT_MONTH_IDX ? COLORS.copper : COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, textAlign: "center", borderBottom: `1px solid ${COLORS.border}` }}>{m}</th>
+                ))}
+                <th style={{ padding: "8px 10px", fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, textAlign: "right", borderBottom: `1px solid ${COLORS.border}` }}>Year</th>
+              </tr>
+            </thead>
+            <tbody>
+              {["mandatory", "extras"].map((kind) => {
+                const row = monthly[kind];
+                const total = row.reduce((s, v) => s + v, 0);
+                return (
+                  <tr key={kind}>
+                    <td style={{ padding: "6px 10px", fontWeight: 700, color: COLORS.ink, textTransform: "capitalize", borderBottom: `1px solid ${COLORS.borderSoft}` }}>{kind}</td>
+                    {row.map((v, i) => (
+                      <td key={i} style={{ padding: "4px 4px", textAlign: "center", borderBottom: `1px solid ${COLORS.borderSoft}` }}>
+                        <input
+                          type="number" value={v} disabled={!canEdit}
+                          onChange={(e) => setMonthly((m) => ({ ...m, [kind]: m[kind].map((x, j) => j === i ? Number(e.target.value) : x) }))}
+                          style={{
+                            width: "100%", padding: "5px 4px", fontSize: 11, fontFamily: fontBody, fontWeight: 600, color: COLORS.ink,
+                            backgroundColor: i === CURRENT_MONTH_IDX ? "rgba(255,90,31,0.06)" : COLORS.bg,
+                            border: `1px solid ${i === CURRENT_MONTH_IDX ? COLORS.copper + "60" : COLORS.border}`,
+                            borderRadius: 5, outline: "none", boxSizing: "border-box", textAlign: "right", fontVariantNumeric: "tabular-nums",
+                          }}
+                        />
+                      </td>
+                    ))}
+                    <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 700, color: COLORS.ink, fontVariantNumeric: "tabular-nums", borderBottom: `1px solid ${COLORS.borderSoft}` }}>{fmtShort(total)}</td>
+                  </tr>
+                );
+              })}
+              <tr>
+                <td style={{ padding: "8px 10px", fontWeight: 700, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontSize: 10 }}>Total</td>
+                {MONTH_LABELS.map((_, i) => {
+                  const t = monthly.mandatory[i] + monthly.extras[i];
+                  return <td key={i} style={{ padding: "6px 4px", textAlign: "center", fontSize: 11, fontWeight: 700, color: COLORS.ink, fontVariantNumeric: "tabular-nums" }}>{fmtShort(t)}</td>;
+                })}
+                <td style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700, color: COLORS.forestText, fontVariantNumeric: "tabular-nums" }}>{fmtShort(monthly.mandatory.reduce((s, v) => s + v, 0) + monthly.extras.reduce((s, v) => s + v, 0))}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
+};
+
+const SmartBudgetPage = ({ currentUser, activeCampus, campuses }) => {
+  const [selectedMonth, setSelectedMonth] = useState(CURRENT_MONTH_IDX);
+  // Effective campus: HQ default to Bellevue for the per-campus view, others locked.
+  const effectiveCampusId = activeCampus === "all"
+    ? (currentUser?.campusId || "bellevue")
+    : activeCampus;
+  const campus = campuses.find((c) => c.id === effectiveCampusId);
+
+  return (
+    <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 18 }}>
+      {/* Hero */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 24, fontWeight: 700, color: COLORS.ink, letterSpacing: -0.5 }}>
+            Smart budget · {campus?.name || "Campus"}
+          </div>
+          <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 2 }}>
+            Watchdog for mandatory + extras + paid events. Click a month in the strip below to drill in.
+          </div>
+        </div>
+        {activeCampus === "all" && currentUser?.role === ROLE_HQ && (
+          <Pill tone="copper">Showing {campus?.name} · use campus dropdown to switch</Pill>
+        )}
+      </div>
+
+      <YearCoverageStrip campusId={effectiveCampusId} selectedMonth={selectedMonth} onPickMonth={setSelectedMonth} />
+      <SmartWarningBanner campusId={effectiveCampusId} monthIdx={selectedMonth} />
+      <MandatoryVsExtrasCard campusId={effectiveCampusId} monthIdx={selectedMonth} />
+      <EventsCoverageMonitor campuses={campuses} scopeCampusId={effectiveCampusId} />
+      <AnnualBudgetPlanner campusId={effectiveCampusId} currentUser={currentUser} />
+    </div>
+  );
+};
+
+const FundingSourceBanner = ({ activeCampus, campuses, connections, currentUser, onRequestChange }) => {
+  const isAll = activeCampus === "all";
+  const campus = isAll ? null : campuses.find((c) => c.id === activeCampus);
+  const directConnections = campus ? connections.filter((c) => c.scope === campus.id) : [];
+  const inheritedConnections = connections.filter((c) => c.scope === "all");
+
+  let fundingState, label, sublabel, color, Icon, accent;
+  if (isAll) {
+    fundingState = "rollup"; label = "Org-wide rollup"; sublabel = `Aggregating ${campuses.length} campuses · all donation sources combined`;
+    color = COLORS.copper; Icon = Globe; accent = COLORS.copper;
+  } else if (campus.isHQ) {
+    fundingState = "master"; label = `${campus.name} · HQ master`; sublabel = `${directConnections.length + inheritedConnections.length} live sources · funds the whole org`;
+    color = COLORS.copper; Icon = Building2; accent = COLORS.copper;
+  } else if (directConnections.length > 0) {
+    fundingState = "independent"; label = `${campus.name} · independent`; sublabel = `${directConnections.length} own source${directConnections.length === 1 ? "" : "s"} · stopped inheriting from HQ`;
+    color = COLORS.green; Icon = Check; accent = COLORS.green;
+  } else {
+    fundingState = "inheriting"; label = `${campus.name} · funded by HQ`; sublabel = `Inheriting from Bellevue · no own sources connected yet`;
+    color = COLORS.amber; Icon = ArrowDownRight; accent = COLORS.amber;
+  }
+
+  const isCampusAdmin = currentUser?.role === ROLE_CAMPUS;
+  const isMinistryLeader = currentUser?.role === ROLE_MINISTRY;
+
+  return (
+    <Card style={{
+      padding: 18, position: "relative", overflow: "hidden",
+      background: `linear-gradient(135deg, ${COLORS.surface} 0%, ${accent}10 100%)`,
+      borderColor: accent + "50",
+    }}>
+      <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 4, backgroundColor: accent }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 9, backgroundColor: accent + "20", color: accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Icon size={18} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 11, color: accent, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Funding source</div>
+            {fundingState === "master" && <Pill tone="copper">★ HQ</Pill>}
+            {fundingState === "independent" && <Pill tone="success">Own books</Pill>}
+            {fundingState === "inheriting" && <Pill tone="warn">Shared with HQ</Pill>}
+          </div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 17, fontWeight: 700, color: COLORS.ink }}>{label}</div>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>{sublabel}</div>
+        </div>
+        {isCampusAdmin && fundingState !== "rollup" && (
+          <button onClick={onRequestChange} style={{
+            padding: "9px 14px", border: `1px solid ${COLORS.copper}`, borderRadius: 8,
+            backgroundColor: COLORS.copper + "15", color: COLORS.copper,
+            fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: fontBody,
+            display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
+          }}>
+            <Mail size={12} /> Request budget change
+          </button>
+        )}
+        {isMinistryLeader && (
+          <Pill tone="neutral"><Lock size={11} /> Read only</Pill>
+        )}
+      </div>
+    </Card>
+  );
+};
+
+const BudgetRequestModal = ({ campus, onSubmit, onClose }) => {
+  const [type, setType] = useState("increase");
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const canSubmit = amount && Number(amount) > 0 && reason.trim().length >= 10;
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(10,10,10,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: COLORS.surface, borderRadius: 16, width: 540, maxWidth: "100%", boxShadow: "0 25px 80px rgba(0,0,0,0.6)", border: `1px solid ${COLORS.border}` }}>
+        <div style={{ padding: "22px 24px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Budget request</div>
+            <div style={{ fontFamily: fontDisplay, fontSize: 19, fontWeight: 600, color: COLORS.ink, marginTop: 4 }}>Send to HQ for {campus?.name || "this campus"}</div>
+            <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 4, fontStyle: "italic" }}>HQ admins receive this in their queue and can approve, deny, or open discussion.</div>
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}><X size={18} color={COLORS.inkSoft} /></button>
+        </div>
+        <div style={{ padding: 22, display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <label style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, marginBottom: 6, display: "block" }}>Request type</label>
+            <div style={{ display: "flex", gap: 6 }}>
+              {["increase", "decrease", "new line"].map((t) => (
+                <button key={t} onClick={() => setType(t)} style={{
+                  padding: "7px 12px", border: type === t ? `2px solid ${COLORS.forest}` : `1px solid ${COLORS.border}`,
+                  borderRadius: 7, backgroundColor: type === t ? "rgba(212,255,0,0.06)" : "transparent",
+                  fontFamily: fontBody, fontWeight: 600, fontSize: 12, color: COLORS.ink, cursor: "pointer", textTransform: "capitalize",
+                }}>{t}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, marginBottom: 6, display: "block" }}>Amount ($)</label>
+            <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="e.g. 5000" style={{
+              width: "100%", padding: "10px 12px", fontSize: 13, fontFamily: fontBody, color: COLORS.ink,
+              backgroundColor: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+            }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, marginBottom: 6, display: "block" }}>Reason (10+ chars)</label>
+            <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Tacoma's youth ministry has grown 40% — need more program budget for camps and weekly events." style={{
+              width: "100%", padding: "10px 12px", fontSize: 13, fontFamily: fontBody, color: COLORS.ink,
+              backgroundColor: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box",
+              minHeight: 90, resize: "vertical",
+            }} />
+          </div>
+        </div>
+        <div style={{ padding: "16px 24px", borderTop: `1px solid ${COLORS.border}`, backgroundColor: COLORS.bg, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button onClick={onClose} style={{ padding: "10px 18px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody }}>Cancel</button>
+          <button onClick={() => canSubmit && onSubmit({ type, amount: Number(amount), reason })} disabled={!canSubmit} style={{
+            padding: "10px 22px", border: "none", borderRadius: 9,
+            backgroundColor: canSubmit ? COLORS.forest : COLORS.cream,
+            color: canSubmit ? ON_LIME : COLORS.inkSoft,
+            fontWeight: 700, fontSize: 13, cursor: canSubmit ? "pointer" : "not-allowed", fontFamily: fontBody,
+            display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <Mail size={13} /> Send to HQ
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const BudgetPage = ({ ministries, updateMinistryBudget, logActivity, recurringPayments, operatingOverheadMo, survivalFloorMo, currentUser, activeCampus, campuses, connections }) => {
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [requestSent, setRequestSent] = useState(null);
+  const isMinistryLeader = currentUser?.role === ROLE_MINISTRY;
   const [alerts, setAlerts] = useState({
     donationsBelowOverhead: true,
     ministryOverBudget: true,
@@ -2343,7 +3208,50 @@ const BudgetPage = ({ ministries, updateMinistryBudget, logActivity, recurringPa
     <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 24 }}>
 
       {/* QUARTERLY REVIEW BANNER */}
-      <QuarterlyReviewBanner ministries={ministries} updateMinistryBudget={updateMinistryBudget} logActivity={logActivity} onScrollToRecs={scrollToRecs} />
+      {/* FUNDING SOURCE BANNER */}
+      <FundingSourceBanner
+        activeCampus={activeCampus}
+        campuses={campuses}
+        connections={connections || []}
+        currentUser={currentUser}
+        onRequestChange={() => setRequestOpen(true)}
+      />
+
+      {/* RECENT REQUEST FLASH */}
+      {requestSent && (
+        <Card style={{ padding: 14, backgroundColor: "rgba(74,222,128,0.06)", borderColor: COLORS.green + "60", display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 7, backgroundColor: COLORS.green, color: ON_GREEN, display: "flex", alignItems: "center", justifyContent: "center" }}><Check size={14} strokeWidth={3} /></div>
+          <div style={{ flex: 1, fontSize: 13, color: COLORS.ink }}>
+            <strong>Request sent to HQ.</strong> {requestSent.type} · ${requestSent.amount.toLocaleString()} · awaiting review.
+          </div>
+          <button onClick={() => setRequestSent(null)} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: COLORS.inkSoft }}><X size={16} /></button>
+        </Card>
+      )}
+
+      {/* MINISTRY LEADER LOCK NOTICE */}
+      {isMinistryLeader && (
+        <Card style={{ padding: 14, backgroundColor: "rgba(251,191,36,0.06)", borderColor: COLORS.amber + "40", display: "flex", alignItems: "center", gap: 12 }}>
+          <Lock size={16} color={COLORS.amber} />
+          <div style={{ flex: 1, fontSize: 13, color: COLORS.ink, lineHeight: 1.5 }}>
+            <strong>Read-only view.</strong> Ministry leaders see budget context for awareness. Changes go through your campus admin.
+          </div>
+        </Card>
+      )}
+
+      {requestOpen && (
+        <BudgetRequestModal
+          campus={campuses?.find((c) => c.id === activeCampus)}
+          onSubmit={(req) => {
+            logActivity({ type: "review", note: `Budget ${req.type} request: $${req.amount.toLocaleString()} — ${req.reason.slice(0, 80)}${req.reason.length > 80 ? "…" : ""}` });
+            setRequestSent(req);
+            setRequestOpen(false);
+          }}
+          onClose={() => setRequestOpen(false)}
+        />
+      )}
+
+      {!isMinistryLeader && (
+      <QuarterlyReviewBanner ministries={ministries} updateMinistryBudget={updateMinistryBudget} logActivity={logActivity} onScrollToRecs={scrollToRecs} />)}
 
       {/* HERO SUMMARY */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
@@ -3484,9 +4392,9 @@ const CampusesPage = ({ campuses, addCampus, setActiveCampus }) => {
 // ============================================================
 
 const ADMIN_TYPE_TONE = {
-  executive: { color: COLORS.forest, bg: "rgba(74,222,128,0.16)", label: "Executive" },
-  function: { color: COLORS.copper, bg: "rgba(255,90,31,0.18)", label: "Function" },
-  campus: { color: COLORS.amber, bg: "rgba(251,191,36,0.18)", label: "Campus" },
+  executive: { get color() { return COLORS.forestText; }, bg: "rgba(74,222,128,0.16)", label: "Executive" },
+  function: { get color() { return COLORS.copper; }, bg: "rgba(255,90,31,0.18)", label: "Function" },
+  campus: { get color() { return COLORS.amber; }, bg: "rgba(251,191,36,0.18)", label: "Campus" },
 };
 
 // Computes per-admin totals from current assignments.
@@ -4081,12 +4989,12 @@ const ReceiptsPage = ({ openReceiptModal }) => {
 // ============================================================
 
 const ACTIVITY_TYPES = {
-  roll:         { label: "Roll forward",  icon: ArrowUpRight,  color: COLORS.forest },
-  return:       { label: "Return to fund",icon: ArrowDownRight,color: COLORS.copper },
-  budget:       { label: "Budget change", icon: Edit3,          color: COLORS.amber },
-  notification: { label: "Notification",  icon: Mail,           color: COLORS.copper },
-  alert:        { label: "Alert fired",   icon: AlertTriangle,  color: COLORS.red },
-  review:       { label: "Quarterly review", icon: Check,       color: COLORS.green },
+  roll:         { label: "Roll forward",     icon: ArrowUpRight,   get color() { return COLORS.forestText; } },
+  return:       { label: "Return to fund",   icon: ArrowDownRight, get color() { return COLORS.copper; } },
+  budget:       { label: "Budget change",    icon: Edit3,          get color() { return COLORS.amber; } },
+  notification: { label: "Notification",     icon: Mail,           get color() { return COLORS.copper; } },
+  alert:        { label: "Alert fired",      icon: AlertTriangle,  get color() { return COLORS.red; } },
+  review:       { label: "Quarterly review", icon: Check,          get color() { return COLORS.green; } },
 };
 
 const FILTER_TABS = [
@@ -4255,66 +5163,285 @@ const ActivityPage = ({ activityLog }) => {
 // PEOPLE / PERMISSIONS PAGE
 // ============================================================
 
-const PeoplePage = () => {
-  const ROLES = [
-    { name: "Full Admin", desc: "Everything · all campuses · billing · permissions", count: 1, color: COLORS.forest },
-    { name: "Finance Admin", desc: "Donations · expenses · QuickBooks · reports", count: 1, color: COLORS.copper },
-    { name: "Campus Admin", desc: "Their campus only · ministries · receipts", count: 2, color: COLORS.green },
-    { name: "Ministry Leader", desc: "Their ministry only · receipts · budget view", count: 4, color: COLORS.amber },
-    { name: "View Only", desc: "Read access for board members & auditors", count: 0, color: COLORS.inkSoft },
-  ];
+// Map TEAM access strings → role enum used for hierarchy + invite modal.
+const accessToRole = (access) => {
+  if (access === "Full Admin" || access === "Finance Admin") return ROLE_HQ;
+  if (access === "Campus Admin") return ROLE_CAMPUS;
+  return ROLE_MINISTRY;
+};
+
+const RoleBadge = ({ access }) => (
+  <Pill tone={access === "Full Admin" ? "forest" : access === "Finance Admin" ? "copper" : access === "Campus Admin" ? "success" : "neutral"}>
+    {access}
+  </Pill>
+);
+
+const PersonRow = ({ p, canEdit }) => (
+  <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 100px auto", gap: 12, padding: "12px 14px", borderRadius: 8, alignItems: "center", backgroundColor: COLORS.bg, border: `1px solid ${COLORS.borderSoft}` }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ width: 34, height: 34, borderRadius: "50%", backgroundColor: COLORS.forest, color: ON_LIME, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12 }}>{p.avatar}</div>
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{p.name}</div>
+        <div style={{ fontSize: 11, color: COLORS.inkSoft }}>{p.email}</div>
+      </div>
+    </div>
+    <div style={{ fontSize: 12, color: COLORS.ink }}>{p.role}</div>
+    <RoleBadge access={p.access} />
+    <div style={{ fontSize: 11, color: p.lastActive.includes("now") ? COLORS.green : COLORS.inkSoft }}>{p.lastActive}</div>
+    <div style={{ display: "flex", gap: 4 }}>
+      {canEdit ? (
+        <>
+          <button title="Edit" style={{ background: "transparent", border: "none", padding: 6, cursor: "pointer", color: COLORS.inkSoft, borderRadius: 6 }}><Edit3 size={13} /></button>
+          <button title="Remove" style={{ background: "transparent", border: "none", padding: 6, cursor: "pointer", color: COLORS.red, borderRadius: 6 }}><Trash2 size={13} /></button>
+        </>
+      ) : null}
+    </div>
+  </div>
+);
+
+const InviteAdminModal = ({ currentUser, campuses, ministries, onClose, onInvite }) => {
+  const isHQ = currentUser?.role === ROLE_HQ;
+  const allowedRoles = isHQ ? [ROLE_HQ, ROLE_CAMPUS, ROLE_MINISTRY] : [ROLE_MINISTRY];
+  const [role, setRole] = useState(allowedRoles[0]);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  // For campus admins inviting ministry leaders: campus is locked to their own.
+  const [campusId, setCampusId] = useState(isHQ ? campuses[0]?.id : currentUser?.campusId);
+  const [ministryId, setMinistryId] = useState("");
+
+  const availableMinistries = ministries.filter((m) => m.campusId === campusId);
+  const canSubmit = name.trim() && email.includes("@") && (role !== ROLE_MINISTRY || ministryId);
 
   return (
-    <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12 }}>
-        {ROLES.map((r, i) => (
-          <Card key={i} style={{ padding: 18, position: "relative", overflow: "hidden" }}>
-            <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: 3, backgroundColor: r.color }} />
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <Shield size={14} color={r.color} />
-              <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink }}>{r.name}</div>
-            </div>
-            <div style={{ fontSize: 11, color: COLORS.inkSoft, lineHeight: 1.5, marginBottom: 10, minHeight: 32 }}>{r.desc}</div>
-            <div style={{ fontFamily: fontDisplay, fontSize: 22, fontWeight: 500, color: COLORS.ink }}>{r.count}</div>
-            <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.3 }}>active</div>
-          </Card>
-        ))}
-      </div>
-
-      <Card style={{ padding: 24 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(10,10,10,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: COLORS.surface, borderRadius: 16, width: 540, maxWidth: "100%", boxShadow: "0 25px 80px rgba(0,0,0,0.6)", border: `1px solid ${COLORS.border}` }}>
+        <div style={{ padding: "22px 24px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 500, color: COLORS.ink, fontStyle: "italic" }}>Team & access</div>
-            <div style={{ fontSize: 12, color: COLORS.inkSoft }}>{TEAM.length} active members · invite ministry leaders with limited access</div>
+            <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Invite member</div>
+            <div style={{ fontFamily: fontDisplay, fontSize: 19, fontWeight: 600, color: COLORS.ink, marginTop: 4 }}>Add a new {ROLE_LABELS[role].toLowerCase()}</div>
+            {!isHQ && (
+              <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 4, fontStyle: "italic" }}>
+                Campus admins can only invite ministry leaders for their own campus.
+              </div>
+            )}
           </div>
-          <button style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.forest, color: ON_LIME, border: "none", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
-            <UserPlus size={14} /> Invite member
+          <button onClick={onClose} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}><X size={18} color={COLORS.inkSoft} /></button>
+        </div>
+        <div style={{ padding: 22, display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <label style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, marginBottom: 6, display: "block" }}>Role</label>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {allowedRoles.map((r) => (
+                <button key={r} onClick={() => setRole(r)} style={{
+                  padding: "7px 12px", border: role === r ? `2px solid ${COLORS.forest}` : `1px solid ${COLORS.border}`,
+                  borderRadius: 7, backgroundColor: role === r ? "rgba(212,255,0,0.06)" : "transparent",
+                  fontFamily: fontBody, fontWeight: 600, fontSize: 12, color: COLORS.ink, cursor: "pointer",
+                }}>{ROLE_LABELS[r]}</button>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, marginBottom: 6, display: "block" }}>Name</label>
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sarah K." style={{ width: "100%", padding: "10px 12px", fontSize: 13, fontFamily: fontBody, color: COLORS.ink, backgroundColor: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box" }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, marginBottom: 6, display: "block" }}>Email</label>
+              <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="sarah@ircchurch.org" style={{ width: "100%", padding: "10px 12px", fontSize: 13, fontFamily: fontBody, color: COLORS.ink, backgroundColor: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none", boxSizing: "border-box" }} />
+            </div>
+          </div>
+          {role !== ROLE_HQ && (
+            <div>
+              <label style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, marginBottom: 6, display: "block" }}>Campus</label>
+              <select disabled={!isHQ} value={campusId} onChange={(e) => { setCampusId(e.target.value); setMinistryId(""); }} style={{
+                width: "100%", padding: "10px 12px", fontSize: 13, fontFamily: fontBody, color: COLORS.ink,
+                backgroundColor: isHQ ? COLORS.bg : COLORS.cream, border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none",
+              }}>
+                {campuses.map((c) => <option key={c.id} value={c.id}>{c.name}{c.isHQ ? " (HQ)" : ""}</option>)}
+              </select>
+              {!isHQ && <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 4, fontStyle: "italic" }}>Locked to your campus.</div>}
+            </div>
+          )}
+          {role === ROLE_MINISTRY && (
+            <div>
+              <label style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700, marginBottom: 6, display: "block" }}>Ministry</label>
+              <select value={ministryId} onChange={(e) => setMinistryId(e.target.value)} style={{
+                width: "100%", padding: "10px 12px", fontSize: 13, fontFamily: fontBody, color: COLORS.ink,
+                backgroundColor: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, outline: "none",
+              }}>
+                <option value="">— Pick a ministry —</option>
+                {availableMinistries.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+              {availableMinistries.length === 0 && <div style={{ fontSize: 11, color: COLORS.amber, marginTop: 4, fontStyle: "italic" }}>No ministries on this campus yet — create one first.</div>}
+            </div>
+          )}
+        </div>
+        <div style={{ padding: "16px 22px", borderTop: `1px solid ${COLORS.border}`, backgroundColor: COLORS.bg, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button onClick={onClose} style={{ padding: "10px 18px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody }}>Cancel</button>
+          <button onClick={() => canSubmit && onInvite({ role, name, email, campusId, ministryId })} disabled={!canSubmit} style={{
+            padding: "10px 22px", border: "none", borderRadius: 9,
+            backgroundColor: canSubmit ? COLORS.forest : COLORS.cream,
+            color: canSubmit ? ON_LIME : COLORS.inkSoft,
+            fontWeight: 700, fontSize: 13, cursor: canSubmit ? "pointer" : "not-allowed", fontFamily: fontBody,
+            display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <Mail size={13} /> Send invite
           </button>
         </div>
+      </div>
+    </div>
+  );
+};
 
-        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr 80px", gap: 12, padding: "8px 14px", borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>
-          <div>Member</div><div>Role</div><div>Access level</div><div>Campus</div><div>Last active</div>
-        </div>
-        {TEAM.map((p, i) => (
-          <div key={i} style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr 80px", gap: 12, padding: 14, borderBottom: `1px solid ${COLORS.borderSoft}`, alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 38, height: 38, borderRadius: "50%", backgroundColor: COLORS.forest, color: ON_LIME, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13 }}>{p.avatar}</div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{p.name}</div>
-                <div style={{ fontSize: 11, color: COLORS.inkSoft }}>{p.email}</div>
-              </div>
-            </div>
-            <div style={{ fontSize: 13, color: COLORS.ink }}>{p.role}</div>
-            <div>
-              <Pill tone={p.access === "Full Admin" ? "forest" : p.access === "Finance Admin" ? "copper" : p.access === "Campus Admin" ? "success" : "neutral"}>
-                {p.access}
-              </Pill>
-            </div>
-            <div style={{ fontSize: 12, color: COLORS.inkSoft }}>{p.campus}</div>
-            <div style={{ fontSize: 11, color: p.lastActive.includes("now") ? COLORS.green : COLORS.inkSoft }}>{p.lastActive}</div>
+const PeoplePage = ({ currentUser, users, campuses, ministries, admins }) => {
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [expanded, setExpanded] = useState({});
+  const [recentInvite, setRecentInvite] = useState(null);
+
+  const isHQ = currentUser?.role === ROLE_HQ;
+  const isCampusAdmin = currentUser?.role === ROLE_CAMPUS;
+  const isMinistryLeader = currentUser?.role === ROLE_MINISTRY;
+
+  // Group team. Team members have campus name like "Bellevue", "Tacoma", "All".
+  const hqMembers = TEAM.filter((t) => accessToRole(t.access) === ROLE_HQ);
+  const campusGroups = campuses.map((c) => {
+    const members = TEAM.filter((t) => t.campus === c.name);
+    const admin = members.find((m) => accessToRole(m.access) === ROLE_CAMPUS);
+    const leaders = members.filter((m) => accessToRole(m.access) === ROLE_MINISTRY);
+    return { campus: c, admin, leaders };
+  });
+
+  // Visibility: HQ sees everything. Campus admin sees only their campus. Ministry leader same (just their campus subtree, focusing on their own ministry).
+  const visibleHQ = isHQ ? hqMembers : [];
+  const visibleCampusGroups = isHQ ? campusGroups : campusGroups.filter((g) => g.campus.id === currentUser?.campusId);
+
+  const toggleCampus = (id) => setExpanded((e) => ({ ...e, [id]: !e[id] }));
+  const canInvite = !isMinistryLeader;
+
+  return (
+    <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 16 }}>
+
+      {/* HEADER */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div style={{ fontFamily: fontDisplay, fontSize: 24, fontWeight: 600, color: COLORS.ink, letterSpacing: -0.5 }}>
+            {isHQ ? "Org chart" : isCampusAdmin ? `${campuses.find((c) => c.id === currentUser.campusId)?.name} team` : "My team"}
           </div>
-        ))}
-      </Card>
+          <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 2 }}>
+            {isHQ ? `${TEAM.length} people across HQ + ${campuses.length} campuses` : isCampusAdmin ? `Your campus admins and ministry leaders` : "Your campus context"}
+          </div>
+        </div>
+        {canInvite && (
+          <button onClick={() => setInviteOpen(true)} style={{
+            display: "flex", alignItems: "center", gap: 6, backgroundColor: COLORS.forest, color: ON_LIME,
+            border: "none", padding: "10px 18px", borderRadius: 9, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody,
+          }}>
+            <UserPlus size={14} /> Invite {isCampusAdmin ? "ministry leader" : "member"}
+          </button>
+        )}
+      </div>
+
+      {/* RECENT INVITE FLASH */}
+      {recentInvite && (
+        <Card style={{ padding: 14, backgroundColor: "rgba(74,222,128,0.06)", borderColor: COLORS.green + "60", display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 7, backgroundColor: COLORS.green, color: ON_GREEN, display: "flex", alignItems: "center", justifyContent: "center" }}><Check size={14} strokeWidth={3} /></div>
+          <div style={{ flex: 1, fontSize: 13, color: COLORS.ink }}>
+            <strong>Invite sent.</strong> {recentInvite.name} ({recentInvite.email}) — {ROLE_LABELS[recentInvite.role]}
+          </div>
+          <button onClick={() => setRecentInvite(null)} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: COLORS.inkSoft }}><X size={16} /></button>
+        </Card>
+      )}
+
+      {/* HQ ADMIN SECTION */}
+      {visibleHQ.length > 0 && (
+        <Card style={{ padding: 22, position: "relative", overflow: "hidden", borderColor: COLORS.copper + "50" }}>
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, backgroundColor: COLORS.copper }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, marginTop: 4 }}>
+            <Shield size={16} color={COLORS.copper} />
+            <div style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 600, color: COLORS.ink }}>HQ admins</div>
+            <Pill tone="copper">{visibleHQ.length}</Pill>
+            <span style={{ fontSize: 12, color: COLORS.inkSoft, marginLeft: "auto" }}>Org-wide access · all campuses</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {visibleHQ.map((p, i) => <PersonRow key={i} p={p} canEdit={isHQ} />)}
+          </div>
+        </Card>
+      )}
+
+      {/* CAMPUS SUBTREES */}
+      {visibleCampusGroups.map((g) => {
+        const open = expanded[g.campus.id] !== false; // default open
+        const totalCount = (g.admin ? 1 : 0) + g.leaders.length;
+        return (
+          <Card key={g.campus.id} style={{ padding: 0, overflow: "hidden", borderColor: g.campus.color + "40" }}>
+            <button
+              onClick={() => toggleCampus(g.campus.id)}
+              style={{
+                width: "100%", padding: "16px 22px", display: "flex", alignItems: "center", gap: 12,
+                backgroundColor: g.campus.color + "10", border: "none", cursor: "pointer", textAlign: "left", fontFamily: fontBody,
+                borderBottom: open ? `1px solid ${COLORS.border}` : "none",
+              }}
+            >
+              <div style={{ width: 36, height: 36, borderRadius: 9, backgroundColor: g.campus.color, color: textOnBg(g.campus.color), display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fontDisplay, fontWeight: 700, fontSize: 15 }}>{g.campus.short}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontFamily: fontDisplay, fontSize: 17, fontWeight: 600, color: COLORS.ink }}>{g.campus.name}</span>
+                  {g.campus.isHQ && <Pill tone="copper">HQ</Pill>}
+                </div>
+                <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 2 }}>
+                  {g.campus.address} · {totalCount} {totalCount === 1 ? "person" : "people"}
+                  {!g.admin && !g.campus.isHQ && <span style={{ color: COLORS.amber, fontWeight: 700 }}> · no campus admin assigned</span>}
+                </div>
+              </div>
+              <ChevronRight size={16} color={COLORS.inkSoft} style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s" }} />
+            </button>
+            {open && (
+              <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 10 }}>
+                {g.admin ? (
+                  <div>
+                    <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, marginBottom: 6 }}>Campus admin</div>
+                    <PersonRow p={g.admin} canEdit={isHQ} />
+                  </div>
+                ) : g.campus.isHQ ? null : (
+                  <div style={{ padding: 14, border: `1px dashed ${COLORS.border}`, borderRadius: 9, textAlign: "center" }}>
+                    <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 8 }}>No campus admin assigned to {g.campus.name}</div>
+                    {isHQ && (
+                      <button onClick={() => setInviteOpen(true)} style={{ background: COLORS.cream, border: `1px solid ${COLORS.border}`, padding: "7px 12px", borderRadius: 7, fontSize: 12, fontWeight: 600, fontFamily: fontBody, cursor: "pointer", color: COLORS.ink, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <UserPlus size={12} /> Assign campus admin
+                      </button>
+                    )}
+                  </div>
+                )}
+                <div>
+                  <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, marginBottom: 6 }}>Ministry leaders ({g.leaders.length})</div>
+                  {g.leaders.length === 0 ? (
+                    <div style={{ padding: 14, border: `1px dashed ${COLORS.border}`, borderRadius: 9, fontSize: 12, color: COLORS.inkSoft, textAlign: "center", fontStyle: "italic" }}>
+                      No ministry leaders yet on this campus.
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {g.leaders.map((p, i) => {
+                        const isSelf = currentUser?.role === ROLE_MINISTRY && p.email.startsWith(currentUser.id.replace("u-", ""));
+                        return <PersonRow key={i} p={p} canEdit={isHQ || (isCampusAdmin && currentUser.campusId === g.campus.id)} />;
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </Card>
+        );
+      })}
+
+      {inviteOpen && (
+        <InviteAdminModal
+          currentUser={currentUser}
+          campuses={campuses}
+          ministries={ministries}
+          onClose={() => setInviteOpen(false)}
+          onInvite={(invite) => { setRecentInvite(invite); setInviteOpen(false); }}
+        />
+      )}
 
       <Card style={{ padding: 24 }}>
         <div style={{ marginBottom: 16 }}>
@@ -4958,7 +6085,310 @@ const ThemeMockup = ({ palette }) => (
   </div>
 );
 
-const SettingsPage = ({ themeMode, setThemeMode, onSignOut }) => {
+// Donation routing modes shown in the Settings panel.
+const ROUTING_MODES = [
+  { id: "pooled",      label: "Pooled",      sublabel: "One master account",   desc: "All campuses' donations land in HQ Bellevue. Satellites inherit. Easiest start for a young multi-site.", icon: Globe,   recommended: true },
+  { id: "hybrid",      label: "Hybrid",      sublabel: "Mixed routing",        desc: "Some sources pool to HQ, others route per campus. Define rules per source — best for transitions.", icon: Sparkles },
+  { id: "independent", label: "Independent", sublabel: "Each campus its own",  desc: "Every campus collects its own donations into its own books. Full autonomy — usually after a campus matures.", icon: Building2 },
+];
+
+const AddSourceModal = ({ campus, onConnect, onClose }) => {
+  const [picked, setPicked] = useState(null);
+  const providers = INTEGRATIONS.filter((i) => i.donations);
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(10,10,10,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: COLORS.surface, borderRadius: 16, width: 540, maxWidth: "100%", display: "flex", flexDirection: "column", boxShadow: "0 25px 80px rgba(0,0,0,0.6)", border: `1px solid ${COLORS.border}` }}>
+        <div style={{ padding: "22px 24px", borderBottom: `1px solid ${COLORS.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 14 }}>
+          <div>
+            <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>{campus.name} · own source</div>
+            <div style={{ fontFamily: fontDisplay, fontSize: 19, fontWeight: 600, color: COLORS.ink, marginTop: 4 }}>Pick a provider for {campus.name}</div>
+            <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 4, fontStyle: "italic" }}>
+              After this, {campus.name}'s donations stop inheriting from HQ Bellevue.
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}><X size={18} color={COLORS.inkSoft} /></button>
+        </div>
+        <div style={{ padding: 24 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
+            {providers.map((p) => {
+              const sel = picked?.name === p.name;
+              return (
+                <button key={p.name} onClick={() => setPicked(p)} style={{
+                  padding: 14, border: `2px solid ${sel ? COLORS.forest : COLORS.border}`, borderRadius: 10,
+                  backgroundColor: sel ? "rgba(212,255,0,0.08)" : COLORS.bg, cursor: "pointer", fontFamily: fontBody,
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+                }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 9, backgroundColor: p.color, color: p.color === "#FFE01B" ? "#000" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 18 }}>{p.logo}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.ink }}>{p.name}</div>
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ padding: 12, borderRadius: 9, border: `1px solid ${COLORS.copper}40`, backgroundColor: "rgba(255,90,31,0.06)", fontSize: 11, color: COLORS.inkSoft, lineHeight: 1.55 }}>
+            <strong style={{ color: COLORS.ink }}>Reversible.</strong> You can switch back to HQ-pooled inheritance at any time from this panel.
+          </div>
+        </div>
+        <div style={{ padding: "16px 24px", borderTop: `1px solid ${COLORS.border}`, backgroundColor: COLORS.bg, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button onClick={onClose} style={{ padding: "10px 18px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody }}>Cancel</button>
+          <button onClick={() => onConnect(picked)} disabled={!picked} style={{
+            padding: "10px 22px", border: "none", borderRadius: 9,
+            backgroundColor: picked ? COLORS.forest : COLORS.cream,
+            color: picked ? ON_LIME : COLORS.inkSoft,
+            fontWeight: 700, fontSize: 13, cursor: picked ? "pointer" : "not-allowed", fontFamily: fontBody,
+            display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <Link2 size={13} /> Continue to provider
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ConfirmModeModal = ({ targetMode, onConfirm, onClose }) => {
+  const cfg = ROUTING_MODES.find((m) => m.id === targetMode);
+  const warning = targetMode === "independent"
+    ? "Every satellite campus becomes financially independent. Their donations stop flowing to HQ Bellevue."
+    : targetMode === "pooled"
+    ? "All donations from every campus pool into HQ Bellevue's master account. Satellites lose any direct sources."
+    : "You'll define routing rules per source or campus. Next step is the rule editor.";
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(10,10,10,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: COLORS.surface, borderRadius: 16, width: 480, maxWidth: "100%", boxShadow: "0 25px 80px rgba(0,0,0,0.6)", border: `1px solid ${COLORS.border}` }}>
+        <div style={{ padding: 22, borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 9, backgroundColor: COLORS.amber + "20", color: COLORS.amber, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <AlertTriangle size={18} />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: COLORS.amber, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Switch routing mode</div>
+            <div style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 600, color: COLORS.ink, marginTop: 2 }}>Confirm: {cfg.label}</div>
+          </div>
+        </div>
+        <div style={{ padding: 22, fontSize: 13, color: COLORS.ink, lineHeight: 1.6 }}>
+          <p style={{ margin: 0, marginBottom: 12 }}>{warning}</p>
+          <div style={{ padding: 12, borderRadius: 9, border: `1px solid ${COLORS.green}40`, backgroundColor: "rgba(74,222,128,0.06)", fontSize: 12, color: COLORS.inkSoft }}>
+            <strong style={{ color: COLORS.ink }}>Existing donation history is preserved.</strong> This change applies to future donations only.
+          </div>
+        </div>
+        <div style={{ padding: "16px 22px", borderTop: `1px solid ${COLORS.border}`, backgroundColor: COLORS.bg, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button onClick={onClose} style={{ padding: "10px 18px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody }}>Cancel</button>
+          <button onClick={onConfirm} style={{
+            padding: "10px 22px", border: "none", borderRadius: 9,
+            backgroundColor: COLORS.forest, color: ON_LIME,
+            fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody,
+          }}>Switch to {cfg.label}</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DonationRoutingPanel = ({ currentUser, campuses, routingMode, setRoutingMode, connections, upsertConnection }) => {
+  const [pendingMode, setPendingMode] = useState(null);
+  const [addSourceFor, setAddSourceFor] = useState(null);
+  const isHQ = currentUser?.role === ROLE_HQ;
+
+  // Group connections by campus for the routing map.
+  const sourcesForCampus = (campusId) => {
+    const direct = connections.filter((c) => c.scope === campusId);
+    const inherited = connections.filter((c) => c.scope === "all");
+    const isHQCampus = campuses.find((cc) => cc.id === campusId)?.isHQ;
+    return { direct, inherited: isHQCampus ? [] : inherited, isHQCampus };
+  };
+
+  const liveSourceCount = connections.length;
+  const inheritingCount = campuses.filter((c) => !c.isHQ && connections.filter((cc) => cc.scope === c.id).length === 0).length;
+  const totalSatellites = campuses.filter((c) => !c.isHQ).length;
+
+  const handleSwitchMode = (newMode) => { if (newMode === routingMode) return; setPendingMode(newMode); };
+  const confirmModeSwitch = () => { setRoutingMode(pendingMode); setPendingMode(null); };
+
+  const handleAddSource = (provider) => {
+    const conn = {
+      id: `conn-${provider.name.toLowerCase().replace(/\s/g, "-")}-${addSourceFor.id}-${Date.now()}`,
+      integrationName: provider.name,
+      scope: addSourceFor.id,
+      credentials: { mock: "demo" },
+      connectedAt: Date.now(),
+      lastSync: Date.now(),
+    };
+    upsertConnection(conn);
+    setAddSourceFor(null);
+  };
+
+  return (
+    <Card style={{ padding: 24 }}>
+      {/* HEADER */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, marginBottom: 22, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 11, color: COLORS.copper, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Donation routing</div>
+          <div style={{ fontFamily: fontSerif, fontSize: 24, fontStyle: "italic", color: COLORS.ink, marginTop: 6, letterSpacing: -0.4 }}>
+            {isHQ ? "Pick the master mode for the whole org." : currentUser?.role === ROLE_CAMPUS ? "Read-only summary for your campus." : "Contact your campus admin to change routing."}
+          </div>
+          <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 6, lineHeight: 1.55, maxWidth: 620 }}>
+            One source for everyone, or one per campus — your call. Donation providers (Stripe, Square, ACH) can pool to HQ or split per campus. Accounting tools stay org-wide.
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 18 }}>
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Live sources</div>
+            <div style={{ fontFamily: fontDisplay, fontSize: 24, fontWeight: 600, color: COLORS.ink, marginTop: 2, letterSpacing: -0.5 }}>{liveSourceCount}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>Inheriting</div>
+            <div style={{ fontFamily: fontDisplay, fontSize: 24, fontWeight: 600, color: COLORS.forestText, marginTop: 2, letterSpacing: -0.5 }}>{inheritingCount}/{totalSatellites}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* MODE PICKER (HQ only) */}
+      {isHQ ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 22 }}>
+          {ROUTING_MODES.map((m) => {
+            const active = routingMode === m.id;
+            const Icon = m.icon;
+            return (
+              <button key={m.id} onClick={() => handleSwitchMode(m.id)} style={{
+                padding: 18, borderRadius: 12, fontFamily: fontBody, cursor: "pointer", textAlign: "left",
+                backgroundColor: active ? "rgba(212,255,0,0.06)" : COLORS.bg,
+                border: `2px solid ${active ? COLORS.forest : COLORS.border}`,
+                position: "relative", display: "flex", flexDirection: "column", gap: 6,
+              }}>
+                {m.recommended && <div style={{ position: "absolute", top: -8, left: 12, padding: "2px 8px", borderRadius: 99, backgroundColor: COLORS.copper, color: "#fff", fontSize: 9, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>Recommended for IRC today</div>}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Icon size={18} color={active ? COLORS.forestText : COLORS.inkSoft} />
+                  <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>{m.label}</span>
+                  {active && <Pill tone="forest">Active</Pill>}
+                </div>
+                <div style={{ fontSize: 11, color: COLORS.inkSoft, fontWeight: 600 }}>{m.sublabel}</div>
+                <div style={{ fontSize: 12, color: COLORS.ink, lineHeight: 1.5, marginTop: 4 }}>{m.desc}</div>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div style={{ padding: 14, borderRadius: 9, backgroundColor: COLORS.cream, border: `1px solid ${COLORS.borderSoft}`, marginBottom: 22, display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: COLORS.ink }}>
+          <Info size={14} color={COLORS.inkSoft} />
+          Routing mode is set by HQ. Current: <strong>{ROUTING_MODES.find((m) => m.id === routingMode)?.label}</strong>.
+        </div>
+      )}
+
+      {/* CAMPUS ROUTING MAP */}
+      <div style={{ fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, marginBottom: 10 }}>
+        Campus routing · per source
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+        {campuses.map((c) => {
+          const { direct, inherited, isHQCampus } = sourcesForCampus(c.id);
+          const independent = !isHQCampus && direct.length > 0;
+          const inheriting = !isHQCampus && direct.length === 0;
+          // Visibility: HQ sees all; campus admin sees only their campus; ministry leader sees only their campus.
+          if (!isHQ && currentUser?.campusId && currentUser.campusId !== c.id) return null;
+
+          return (
+            <div key={c.id} style={{
+              padding: 16, borderRadius: 11,
+              border: inheriting ? `2px dashed ${COLORS.border}` : `2px solid ${isHQCampus ? COLORS.copper + "60" : c.color}`,
+              backgroundColor: inheriting ? COLORS.bg : isHQCampus ? "rgba(255,90,31,0.04)" : c.color + "10",
+              opacity: inheriting ? 0.85 : 1,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: c.color, color: textOnBg(c.color), display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fontDisplay, fontWeight: 700, fontSize: 14 }}>{c.short}</div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>{c.name}</div>
+                    <div style={{ fontSize: 10, color: COLORS.inkSoft }}>{c.address}</div>
+                  </div>
+                </div>
+                {isHQCampus && <Pill tone="copper">HQ · master</Pill>}
+                {independent && <Pill tone="forest">Independent</Pill>}
+                {inheriting && <Pill tone="neutral">Shared with HQ</Pill>}
+              </div>
+
+              {isHQCampus && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                  {direct.map((conn) => (
+                    <div key={conn.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: COLORS.ink }}>
+                      <Check size={12} color={COLORS.green} /> {conn.integrationName}
+                      {conn.integrationName === "Stripe" && <span style={{ marginLeft: "auto", padding: "1px 6px", borderRadius: 4, backgroundColor: COLORS.amber + "30", color: COLORS.amber, fontSize: 9, fontWeight: 700, letterSpacing: 0.4 }}>MASTER</span>}
+                    </div>
+                  ))}
+                  {inherited.map((conn) => (
+                    <div key={conn.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: COLORS.ink }}>
+                      <Check size={12} color={COLORS.green} /> {conn.integrationName}
+                    </div>
+                  ))}
+                  <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 6, fontStyle: "italic" }}>Funds the org · {direct.length + inherited.length} live sources</div>
+                </div>
+              )}
+
+              {independent && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                  {direct.map((conn) => (
+                    <div key={conn.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: COLORS.ink }}>
+                      <Check size={12} color={COLORS.green} /> {conn.integrationName} · direct
+                    </div>
+                  ))}
+                  <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 6, fontStyle: "italic" }}>Independent · {direct.length} own source{direct.length === 1 ? "" : "s"}</div>
+                </div>
+              )}
+
+              {inheriting && (
+                <>
+                  <div style={{ fontSize: 11, color: COLORS.inkSoft, fontStyle: "italic", marginBottom: 8 }}>Inheriting from Bellevue HQ</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {inherited.map((conn) => (
+                      <div key={conn.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: COLORS.inkSoft, fontStyle: "italic" }}>
+                        <Globe size={11} /> {conn.integrationName}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 12 }}>
+                    {isHQ ? (
+                      <button onClick={() => setAddSourceFor(c)} style={{
+                        padding: "7px 12px", border: `1px solid ${COLORS.border}`, borderRadius: 7,
+                        backgroundColor: COLORS.cream, color: COLORS.ink, fontFamily: fontBody, fontWeight: 600, fontSize: 11,
+                        cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                      }}>
+                        <Plus size={11} /> Connect own source
+                      </button>
+                    ) : currentUser?.campusId === c.id && currentUser?.role === ROLE_CAMPUS ? (
+                      <button style={{
+                        padding: "7px 12px", border: `1px solid ${COLORS.copper}`, borderRadius: 7,
+                        backgroundColor: COLORS.copper + "15", color: COLORS.copper, fontFamily: fontBody, fontWeight: 700, fontSize: 11,
+                        cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                      }}>
+                        <Mail size={11} /> Request own source from HQ
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: 11, color: COLORS.inkSoft, fontStyle: "italic" }}>Contact HQ to add a source</span>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* LEGEND */}
+      {isHQ && (
+        <div style={{ marginTop: 14, display: "flex", gap: 16, flexWrap: "wrap", fontSize: 10, color: COLORS.inkSoft, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.4 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 12, height: 12, border: `2px solid ${COLORS.copper}60`, borderRadius: 3, backgroundColor: "rgba(255,90,31,0.04)" }} /> HQ master</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 12, height: 12, border: `2px dashed ${COLORS.border}`, borderRadius: 3 }} /> Inheriting</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 12, height: 12, border: `2px solid ${COLORS.forest}`, borderRadius: 3 }} /> Independent</span>
+        </div>
+      )}
+
+      {addSourceFor && <AddSourceModal campus={addSourceFor} onConnect={handleAddSource} onClose={() => setAddSourceFor(null)} />}
+      {pendingMode && <ConfirmModeModal targetMode={pendingMode} onConfirm={confirmModeSwitch} onClose={() => setPendingMode(null)} />}
+    </Card>
+  );
+};
+
+const SettingsPage = ({ themeMode, setThemeMode, onSignOut, currentUser, campuses, routingMode, setRoutingMode, connections, upsertConnection }) => {
   const rows = [
     { icon: BellRing, label: "Notifications",   value: "Email + push",                onClick: () => {} },
     { icon: Globe,     label: "Time zone",       value: "Pacific (PT)",                onClick: () => {} },
@@ -4969,6 +6399,16 @@ const SettingsPage = ({ themeMode, setThemeMode, onSignOut }) => {
 
   return (
     <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 20, maxWidth: 1100 }}>
+
+      {/* DONATION ROUTING */}
+      <DonationRoutingPanel
+        currentUser={currentUser}
+        campuses={campuses}
+        routingMode={routingMode}
+        setRoutingMode={setRoutingMode}
+        connections={connections}
+        upsertConnection={upsertConnection}
+      />
 
       {/* APPEARANCE */}
       <Card style={{ padding: 24 }}>
@@ -5088,12 +6528,12 @@ const SettingsPage = ({ themeMode, setThemeMode, onSignOut }) => {
 // ============================================================
 
 const REPORT_DEFINITIONS = [
-  { id: "annual",   name: "Annual Financial Statement", desc: "Full P&L, cash flow, balance sheet — board-ready",                      icon: FileText, color: COLORS.forest, formats: ["PDF", "Excel"],          lastRun: "Dec 31, 2025", badge: null },
-  { id: "donor",    name: "Donor Year-End Letters",     desc: "Auto-merged from Stripe, Square, and manual entries",                  icon: Mail,     color: COLORS.copper, formats: ["PDF", "Mail-merge"],     lastRun: "Dec 10, 2025", badge: { label: "387 ready to send", tone: "success" } },
-  { id: "ministry", name: "Ministry Budget vs. Actual", desc: "Per-ministry variance highlighted, drill into any line item",          icon: BarChart3, color: COLORS.green,  formats: ["PDF", "Excel", "Sheets"], lastRun: "Apr 30, 2026", badge: null },
-  { id: "campus",   name: "Campus Comparison",          desc: "Side-by-side P&L and KPIs across every campus",                        icon: Building2, color: "#A78BFA",     formats: ["PDF", "Sheets"],         lastRun: "Apr 15, 2026", badge: null },
-  { id: "board",    name: "Board Pack",                 desc: "Full board deck — KPIs, alerts, decisions awaiting sign-off",          icon: FileText, color: COLORS.red,    formats: ["PDF", "PowerPoint"],     lastRun: "May 1, 2026",  badge: { label: "Auto · 1st of month", tone: "copper" } },
-  { id: "990",      name: "IRS Form 990 Worksheet",     desc: "Pre-filled rows mapped from QuickBooks classes and accounts",         icon: Shield,   color: COLORS.amber,  formats: ["PDF", "Excel"],          lastRun: "—",           badge: null },
+  { id: "annual",   name: "Annual Financial Statement", desc: "Full P&L, cash flow, balance sheet — board-ready",                      icon: FileText,  get color() { return COLORS.forestText; }, formats: ["PDF", "Excel"],          lastRun: "Dec 31, 2025", badge: null },
+  { id: "donor",    name: "Donor Year-End Letters",     desc: "Auto-merged from Stripe, Square, and manual entries",                  icon: Mail,      get color() { return COLORS.copper; },     formats: ["PDF", "Mail-merge"],     lastRun: "Dec 10, 2025", badge: { label: "387 ready to send", tone: "success" } },
+  { id: "ministry", name: "Ministry Budget vs. Actual", desc: "Per-ministry variance highlighted, drill into any line item",          icon: BarChart3, get color() { return COLORS.green; },      formats: ["PDF", "Excel", "Sheets"], lastRun: "Apr 30, 2026", badge: null },
+  { id: "campus",   name: "Campus Comparison",          desc: "Side-by-side P&L and KPIs across every campus",                        icon: Building2, color: "#A78BFA",                          formats: ["PDF", "Sheets"],         lastRun: "Apr 15, 2026", badge: null },
+  { id: "board",    name: "Board Pack",                 desc: "Full board deck — KPIs, alerts, decisions awaiting sign-off",          icon: FileText,  get color() { return COLORS.red; },        formats: ["PDF", "PowerPoint"],     lastRun: "May 1, 2026",  badge: { label: "Auto · 1st of month", tone: "copper" } },
+  { id: "990",      name: "IRS Form 990 Worksheet",     desc: "Pre-filled rows mapped from QuickBooks classes and accounts",         icon: Shield,    get color() { return COLORS.amber; },      formats: ["PDF", "Excel"],          lastRun: "—",           badge: null },
 ];
 
 const PERIOD_OPTIONS = [
@@ -5597,7 +7037,7 @@ const ReportsPage = ({ campuses, ministries, recurringPayments }) => {
           <a href="#" style={{ fontSize: 12, color: COLORS.copper, fontWeight: 700, textDecoration: "none" }}>View all →</a>
         </div>
         {[
-          { name: "Annual Financial Statement 2025", date: "Dec 31, 2025", by: "Elena Volkov", size: "1.2 MB", format: "PDF",   color: COLORS.forest },
+          { name: "Annual Financial Statement 2025", date: "Dec 31, 2025", by: "Elena Volkov", size: "1.2 MB", format: "PDF",   color: COLORS.forestText },
           { name: "Q4 Ministry Report",              date: "Dec 15, 2025", by: "Pastor Vladimir", size: "840 KB", format: "PDF",   color: COLORS.green },
           { name: "Donor List for Year-End Letters", date: "Dec 10, 2025", by: "Elena Volkov",    size: "2.1 MB", format: "EXCEL", color: COLORS.copper },
           { name: "Camp & Retreat P&L",              date: "Dec 1, 2025",  by: "Elena Volkov",    size: "320 KB", format: "PDF",   color: COLORS.amber },
@@ -5744,6 +7184,41 @@ function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
     setMinistries((prev) => [...prev, ministry]);
     return uniqueId;
   };
+  // Current user — drives role-aware UI. Switch via the topbar role picker
+  // to demo what each role tier sees. In production this comes from auth.
+  const [currentUser, setCurrentUser] = useState(USERS[0]); // default: Pastor Vladimir (HQ Admin)
+
+  // Donation routing — high-level org strategy.
+  // pooled = all donations land in HQ, satellites inherit
+  // hybrid = mixed (some sources route per-campus, others pool)
+  // independent = each campus collects its own
+  const [routingMode, setRoutingMode] = useState("pooled");
+
+  // Lifted donation connections — used by both Integrations page and the
+  // Donation Routing panel in Settings.
+  const [connections, setConnections] = useState(INITIAL_CONNECTIONS);
+  const upsertConnection = (conn) => setConnections((prev) => {
+    const idx = prev.findIndex((c) => c.id === conn.id);
+    if (idx === -1) return [...prev, conn];
+    const next = [...prev]; next[idx] = conn; return next;
+  });
+  const removeConnection = (id) => setConnections((prev) => prev.filter((c) => c.id !== id));
+
+  // Auto-pin the campus filter for non-HQ roles. HQ can switch freely.
+  useEffect(() => {
+    if (currentUser.role !== ROLE_HQ && currentUser.campusId) {
+      setActiveCampus(currentUser.campusId);
+    } else if (currentUser.role === ROLE_HQ) {
+      setActiveCampus("all");
+    }
+  }, [currentUser]);
+
+  // Auto-redirect to dashboard if current page is not in this role's sidebar.
+  useEffect(() => {
+    const allowed = sidebarItemsForRole(currentUser.role).map((it) => it.id);
+    if (!allowed.includes(activePage)) setActivePage("dashboard");
+  }, [currentUser, activePage]);
+
   // Campuses — single source of truth. Edits + new campuses ripple to
   // CampusesPage, TopBar dropdown, IntegrationsPage routing, and beyond.
   const [campuses, setCampuses] = useState(INITIAL_CAMPUSES);
@@ -5858,6 +7333,7 @@ function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
     donations: { t: "Donations", s: "All giving · all sources · all campuses" },
     expenses: { t: "Expenses", s: "Where the money goes" },
     budget: { t: "Budget", s: "Plan, monitor, stress-test — and stay on top of it" },
+    smart: { t: "Smart Budget", s: "Mandatory vs extras coverage · paid event break-even · annual planner" },
     calendar: { t: "Calendar", s: "Recurring payments, scheduled events, and what's owed today" },
     ministries: { t: "Ministries", s: "Budget vs. actual for every department" },
     campuses: { t: "Campuses", s: "Main · Tacoma · New York" },
@@ -5877,11 +7353,16 @@ function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
       case "dashboard": return <DashboardPage ministries={filteredMinistries} operatingOverheadMo={operatingOverheadMo} survivalFloorMo={survivalFloorMo} activeCampus={activeCampus} campuses={campuses} />;
       case "donations": return <DonationsPage />;
       case "expenses": return <ExpensesPage />;
+      case "smart": return <SmartBudgetPage currentUser={currentUser} activeCampus={activeCampus} campuses={campuses} />;
       case "budget": return <BudgetPage
         ministries={filteredMinistries} updateMinistryBudget={updateMinistryBudget} logActivity={logActivity}
         recurringPayments={filteredRecurringPayments}
         operatingOverheadMo={operatingOverheadMo}
         survivalFloorMo={survivalFloorMo}
+        currentUser={currentUser}
+        activeCampus={activeCampus}
+        campuses={campuses}
+        connections={connections}
       />;
       case "calendar": return <CalendarPage
         recurringPayments={filteredRecurringPayments}
@@ -5900,10 +7381,15 @@ function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
       case "events": return <EventsPage />;
       case "receipts": return <ReceiptsPage openReceiptModal={open} />;
       case "activity": return <ActivityPage activityLog={activityLog} />;
-      case "people": return <PeoplePage />;
+      case "people": return <PeoplePage currentUser={currentUser} users={USERS} campuses={campuses} ministries={ministries} admins={admins} />;
       case "integrations": return <IntegrationsPage campuses={campuses} />;
       case "reports": return <ReportsPage campuses={campuses} ministries={ministries} recurringPayments={recurringPayments} />;
-      case "settings": return <SettingsPage themeMode={themeMode} setThemeMode={setThemeMode} onSignOut={onExitDemo} />;
+      case "settings": return <SettingsPage
+        themeMode={themeMode} setThemeMode={setThemeMode} onSignOut={onExitDemo}
+        currentUser={currentUser} campuses={campuses}
+        routingMode={routingMode} setRoutingMode={setRoutingMode}
+        connections={connections} upsertConnection={upsertConnection}
+      />;
       default: return <DashboardPage ministries={filteredMinistries} operatingOverheadMo={operatingOverheadMo} survivalFloorMo={survivalFloorMo} activeCampus={activeCampus} campuses={campuses} />;
     }
   }, [activePage, ministries, admins, activityLog, recurringPayments, operatingOverheadMo, survivalFloorMo, campuses, activeCampus, filteredMinistries, filteredRecurringPayments, campusStats, themeMode]);
@@ -5929,7 +7415,7 @@ function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
 
       <div style={{ display: "flex", minHeight: demo ? "calc(100vh - 44px)" : "100vh" }}>
 
-      <Sidebar activePage={activePage} setActivePage={setActivePage} />
+      <Sidebar activePage={activePage} setActivePage={setActivePage} currentUser={currentUser} />
       <main style={{ flex: 1, minWidth: 0 }}>
         <TopBar
           activeCampus={activeCampus}
@@ -5937,6 +7423,9 @@ function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
           pageTitle={titles[activePage].t}
           pageSubtitle={titles[activePage].s}
           campuses={campuses}
+          currentUser={currentUser}
+          setCurrentUser={setCurrentUser}
+          users={USERS}
         />
         {content}
       </main>
@@ -5991,12 +7480,12 @@ const StewardLogo = ({ inverse = false }) => (
 // ----- LANDING -----------------------------------------------
 
 const LANDING_FEATURES = [
-  { title: "Donations", color: COLORS.forest, icon: HandHeart, body: "Stripe, Square, ACH, and cash — every gift in one ledger, auto-coded to the right ministry." },
-  { title: "Budget", color: COLORS.copper, icon: Target, body: "Plan the year, monitor the month. Smart alerts before you slip. Stress-test against giving drops." },
-  { title: "Multi-campus", color: COLORS.amber, icon: Building2, body: "Roll up Tacoma + NY + Main into one P&L. Per-campus budgets and admins, one source of truth." },
-  { title: "Audit trail", color: COLORS.red, icon: Activity, body: "Every roll, return, budget change, and notification logged. Board-ready CSV export in one click." },
-  { title: "Scenarios", color: "#A78BFA", icon: Sparkles, body: "What-if sliders cascade through operating, surplus, and runway. Save scenarios for quarterly review." },
-  { title: "Forecasting", color: "#22D3EE", icon: TrendingUp, body: "12-month rolling forecast per ministry — past 6 actuals + next 6 projected from seasonal patterns." },
+  { title: "Donations",   icon: HandHeart,  body: "Stripe, Square, ACH, and cash — every gift in one ledger, auto-coded to the right ministry.",                       get color() { return COLORS.forestText; } },
+  { title: "Budget",      icon: Target,     body: "Plan the year, monitor the month. Smart alerts before you slip. Stress-test against giving drops.",                  get color() { return COLORS.copper; } },
+  { title: "Multi-campus",icon: Building2,  body: "Roll up Tacoma + NY + Main into one P&L. Per-campus budgets and admins, one source of truth.",                       get color() { return COLORS.amber; } },
+  { title: "Audit trail", icon: Activity,   body: "Every roll, return, budget change, and notification logged. Board-ready CSV export in one click.",                   get color() { return COLORS.red; } },
+  { title: "Scenarios",   icon: Sparkles,   body: "What-if sliders cascade through operating, surplus, and runway. Save scenarios for quarterly review.", color: "#A78BFA" },
+  { title: "Forecasting", icon: TrendingUp, body: "12-month rolling forecast per ministry — past 6 actuals + next 6 projected from seasonal patterns.",  color: "#22D3EE" },
 ];
 
 const PRICING = [
@@ -6092,7 +7581,7 @@ const Landing = ({ onLogin, onSignup, onDemo }) => {
             {/* KPIs */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 18 }}>
               {[
-                { label: "Donations YTD", value: "$1.88M", color: COLORS.forest },
+                { label: "Donations YTD", value: "$1.88M", color: COLORS.forestText },
                 { label: "Expenses YTD", value: "$1.66M", color: COLORS.copper },
                 { label: "Net savings", value: "$224k", color: COLORS.green },
                 { label: "Year-end balance", value: "$926k", color: COLORS.ink },
@@ -6334,7 +7823,7 @@ const Login = ({ onSubmit, onDemo, onSignup, onBack }) => {
 
           <div style={{ textAlign: "center", marginTop: 22, fontSize: 13, color: COLORS.inkSoft }}>
             New to Steward?{" "}
-            <button onClick={onSignup} style={{ background: "transparent", border: "none", color: COLORS.forest, fontWeight: 700, cursor: "pointer", fontFamily: fontBody, padding: 0, fontSize: 13 }}>
+            <button onClick={onSignup} style={{ background: "transparent", border: "none", color: COLORS.forestText, fontWeight: 700, cursor: "pointer", fontFamily: fontBody, padding: 0, fontSize: 13 }}>
               Start a free trial →
             </button>
           </div>
