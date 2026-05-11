@@ -833,7 +833,7 @@ const Sidebar = ({ activePage, setActivePage, currentUser }) => {
 // TOP BAR
 // ============================================================
 
-const TopBar = ({ activeCampus, setActiveCampus, pageTitle, pageSubtitle, campuses: campusesData, currentUser, setCurrentUser, users }) => {
+const TopBar = ({ activeCampus, setActiveCampus, pageTitle, pageSubtitle, campuses: campusesData, currentUser, setCurrentUser, users, setActivePage }) => {
   const [campusOpen, setCampusOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const isHQ = currentUser?.role === ROLE_HQ;
@@ -974,7 +974,7 @@ const TopBar = ({ activeCampus, setActiveCampus, pageTitle, pageSubtitle, campus
           )}
         </div>
 
-        <button style={{ position: "relative", background: COLORS.surface, padding: 9, borderRadius: 10, cursor: "pointer", border: `1px solid ${COLORS.border}` }}>
+        <button onClick={() => setActivePage && setActivePage("activity")} title="See alerts in Activity" style={{ position: "relative", background: COLORS.surface, padding: 9, borderRadius: 10, cursor: "pointer", border: `1px solid ${COLORS.border}` }}>
           <Bell size={16} color={COLORS.ink} />
           <span style={{ position: "absolute", top: 6, right: 6, width: 7, height: 7, borderRadius: "50%", backgroundColor: COLORS.red }} />
         </button>
@@ -1089,7 +1089,7 @@ const BudgetHealthCard = ({ ministries, operatingOverheadMo, survivalFloorMo }) 
 // DASHBOARD PAGE
 // ============================================================
 
-const DashboardPage = ({ ministries, operatingOverheadMo, survivalFloorMo, activeCampus, campuses }) => {
+const DashboardPage = ({ ministries, operatingOverheadMo, survivalFloorMo, activeCampus, campuses, setActivePage }) => {
   const currentCampus = campuses?.find((c) => c.id === activeCampus);
   const kpis = [
     { label: "Total Donations '25", value: fmt(TOTAL_DONATIONS), trend: "+12.4%", icon: HandHeart, tone: "forest" },
@@ -1217,7 +1217,7 @@ const DashboardPage = ({ ministries, operatingOverheadMo, survivalFloorMo, activ
               <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 500, color: COLORS.ink, fontStyle: "italic" }}>Ministry spend vs. budget</div>
               <div style={{ fontSize: 12, color: COLORS.inkSoft }}>{ministries.length} active ministries</div>
             </div>
-            <button style={{ background: "transparent", border: `1px solid ${COLORS.border}`, padding: "6px 12px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, cursor: "pointer", color: COLORS.ink }}>
+            <button onClick={() => setActivePage && setActivePage("ministries")} style={{ background: "transparent", border: `1px solid ${COLORS.border}`, padding: "6px 12px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, cursor: "pointer", color: COLORS.ink }}>
               View all →
             </button>
           </div>
@@ -4195,8 +4195,8 @@ const MinistriesPage = ({ openReceiptModal, ministries, addMinistry }) => {
                   <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink }}>{m.name}</div>
                   <div style={{ fontSize: 11, color: COLORS.inkSoft }}>Led by {m.leader}</div>
                 </div>
-                <button style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}>
-                  <MoreVertical size={15} color={COLORS.inkSoft} />
+                <button onClick={() => openReceiptModal(m)} title="Upload receipt" style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}>
+                  <Upload size={15} color={COLORS.inkSoft} />
                 </button>
               </div>
 
@@ -5042,6 +5042,20 @@ const EventsPage = () => {
 // ============================================================
 
 const ReceiptsPage = ({ openReceiptModal }) => {
+  const [statusFilter, setStatusFilter] = useState("all"); // all | synced | pending | review
+
+  const exportReceiptsCsv = () => {
+    const rows = [
+      ["Receipt #", "Vendor", "Ministry", "Amount", "Date", "Uploaded by", "Status"].join(","),
+      ...RECENT_RECEIPTS
+        .filter((r) => statusFilter === "all" || r.status === statusFilter)
+        .map((r) => [`#${1000 + r.id}`, r.vendor, r.ministry, r.amount.toFixed(2), r.date, r.uploadedBy, r.status].map((v) => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v).join(",")),
+    ].join("\n");
+    downloadFile(`receipts_${new Date().toISOString().slice(0, 10)}.csv`, rows);
+  };
+
+  const filtered = statusFilter === "all" ? RECENT_RECEIPTS : RECENT_RECEIPTS.filter((r) => r.status === statusFilter);
+
   return (
     <div style={{ padding: "32px 36px", display: "flex", flexDirection: "column", gap: 20 }}>
       <Card style={{
@@ -5071,12 +5085,15 @@ const ReceiptsPage = ({ openReceiptModal }) => {
             <div style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 500, color: COLORS.ink, fontStyle: "italic" }}>Recent receipts</div>
             <div style={{ fontSize: 12, color: COLORS.inkSoft }}>{RECENT_RECEIPTS.length} this month · 4 awaiting approval</div>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: `1px solid ${COLORS.border}`, padding: "7px 12px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, cursor: "pointer", color: COLORS.ink }}>
-              <Filter size={13} /> Filter
-            </button>
-            <button style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: `1px solid ${COLORS.border}`, padding: "7px 12px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, cursor: "pointer", color: COLORS.ink }}>
-              <Download size={13} /> Export
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: "7px 12px", border: `1px solid ${COLORS.border}`, borderRadius: 8, fontSize: 12, fontFamily: fontBody, color: COLORS.ink, backgroundColor: "transparent", cursor: "pointer", outline: "none" }}>
+              <option value="all">All ({RECENT_RECEIPTS.length})</option>
+              <option value="synced">Synced ({RECENT_RECEIPTS.filter((r) => r.status === "synced").length})</option>
+              <option value="pending">Pending ({RECENT_RECEIPTS.filter((r) => r.status === "pending").length})</option>
+              <option value="review">Review ({RECENT_RECEIPTS.filter((r) => r.status === "review").length})</option>
+            </select>
+            <button onClick={exportReceiptsCsv} style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: `1px solid ${COLORS.border}`, padding: "7px 12px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, cursor: "pointer", color: COLORS.ink }}>
+              <Download size={13} /> Export CSV
             </button>
           </div>
         </div>
@@ -5084,7 +5101,12 @@ const ReceiptsPage = ({ openReceiptModal }) => {
         <div style={{ display: "grid", gridTemplateColumns: "60px 1.5fr 1fr 100px 100px 130px 100px", gap: 12, padding: "8px 14px", borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600 }}>
           <div></div><div>Vendor</div><div>Ministry</div><div>Amount</div><div>Date</div><div>Uploaded by</div><div>Status</div>
         </div>
-        {RECENT_RECEIPTS.map((r) => (
+        {filtered.length === 0 && (
+          <div style={{ padding: 24, textAlign: "center", color: COLORS.inkSoft, fontStyle: "italic", fontSize: 13 }}>
+            No receipts match the selected filter.
+          </div>
+        )}
+        {filtered.map((r) => (
           <div key={r.id} style={{
             display: "grid", gridTemplateColumns: "60px 1.5fr 1fr 100px 100px 130px 100px",
             gap: 12, padding: "14px", borderBottom: `1px solid ${COLORS.borderSoft}`,
@@ -5231,7 +5253,19 @@ const ActivityPage = ({ activityLog }) => {
             );
           })}
         </div>
-        <button style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.cream, color: COLORS.ink, border: `1px solid ${COLORS.border}`, padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}>
+        <button
+          onClick={() => {
+            const rows = [
+              ["Timestamp", "Who", "Type", "Ministry", "Amount", "Note"].join(","),
+              ...activityLog.map((e) => [
+                new Date(e.timestamp).toISOString(),
+                e.who, e.type, e.ministry || "", e.amount || 0, e.note,
+              ].map((v) => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v)).join(",")),
+            ].join("\n");
+            downloadFile(`activity_${new Date().toISOString().slice(0, 10)}.csv`, rows);
+          }}
+          style={{ display: "flex", alignItems: "center", gap: 6, background: COLORS.cream, color: COLORS.ink, border: `1px solid ${COLORS.border}`, padding: "8px 14px", borderRadius: 8, fontSize: 12, fontFamily: fontBody, fontWeight: 600, cursor: "pointer" }}
+        >
           <Download size={13} /> Export CSV for board
         </button>
       </div>
@@ -6543,11 +6577,18 @@ const DonationRoutingPanel = ({ currentUser, campuses, routingMode, setRoutingMo
                         <Plus size={11} /> Connect own source
                       </button>
                     ) : currentUser?.campusId === c.id && currentUser?.role === ROLE_CAMPUS ? (
-                      <button style={{
-                        padding: "7px 12px", border: `1px solid ${COLORS.copper}`, borderRadius: 7,
-                        backgroundColor: COLORS.copper + "15", color: COLORS.copper, fontFamily: fontBody, fontWeight: 700, fontSize: 11,
-                        cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-                      }}>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Request HQ to grant ${c.name} its own donation source? An email + in-app notification will go to Pastor V and Elena V.`)) {
+                            alert(`Request sent to HQ. They'll review at the next quarterly meeting.`);
+                          }
+                        }}
+                        style={{
+                          padding: "7px 12px", border: `1px solid ${COLORS.copper}`, borderRadius: 7,
+                          backgroundColor: COLORS.copper + "15", color: COLORS.copper, fontFamily: fontBody, fontWeight: 700, fontSize: 11,
+                          cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                        }}
+                      >
                         <Mail size={11} /> Request own source from HQ
                       </button>
                     ) : (
@@ -6641,9 +6682,9 @@ const SettingsPage = ({ themeMode, setThemeMode, onSignOut, currentUser, campuse
             <strong style={{ color: COLORS.ink }}>Payment method:</strong> Visa •••• 4421
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button style={{ padding: "8px 14px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>Change plan</button>
-            <button style={{ padding: "8px 14px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>Update card</button>
-            <button style={{ padding: "8px 14px", backgroundColor: "transparent", color: COLORS.inkSoft, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>View invoices</button>
+            <button onClick={() => window.open("https://billing.stripe.com/p/login/test", "_blank", "noopener")} style={{ padding: "8px 14px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>Change plan →</button>
+            <button onClick={() => window.open("https://billing.stripe.com/p/login/test", "_blank", "noopener")} style={{ padding: "8px 14px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>Update card →</button>
+            <button onClick={() => window.open("https://billing.stripe.com/p/login/test", "_blank", "noopener")} style={{ padding: "8px 14px", backgroundColor: "transparent", color: COLORS.inkSoft, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: fontBody }}>View invoices →</button>
           </div>
         </div>
       ),
@@ -7328,11 +7369,14 @@ const ReportsPage = ({ campuses, ministries, recurringPayments }) => {
             </div>
           </div>
         </div>
-        <button style={{
-          display: "flex", alignItems: "center", gap: 6,
-          padding: "9px 14px", border: `1px dashed ${COLORS.border}`, borderRadius: 8,
-          backgroundColor: "transparent", color: COLORS.ink, fontFamily: fontBody, fontWeight: 600, fontSize: 12, cursor: "pointer",
-        }}>
+        <button
+          onClick={() => alert("Custom report builder coming soon. For now, pick any built-in report below and adjust the period + campus scope.")}
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "9px 14px", border: `1px dashed ${COLORS.border}`, borderRadius: 8,
+            backgroundColor: "transparent", color: COLORS.ink, fontFamily: fontBody, fontWeight: 600, fontSize: 12, cursor: "pointer",
+          }}
+        >
           <Plus size={13} /> Custom report
         </button>
       </div>
@@ -7461,10 +7505,10 @@ const ReportsPage = ({ campuses, ministries, recurringPayments }) => {
           <a href="#" style={{ fontSize: 12, color: COLORS.copper, fontWeight: 700, textDecoration: "none" }}>View all →</a>
         </div>
         {[
-          { name: "Annual Financial Statement 2025", date: "Dec 31, 2025", by: "Elena Volkov", size: "1.2 MB", format: "PDF",   color: COLORS.forestText },
-          { name: "Q4 Ministry Report",              date: "Dec 15, 2025", by: "Pastor Vladimir", size: "840 KB", format: "PDF",   color: COLORS.green },
-          { name: "Donor List for Year-End Letters", date: "Dec 10, 2025", by: "Elena Volkov",    size: "2.1 MB", format: "EXCEL", color: COLORS.copper },
-          { name: "Camp & Retreat P&L",              date: "Dec 1, 2025",  by: "Elena Volkov",    size: "320 KB", format: "PDF",   color: COLORS.amber },
+          { reportId: "annual",   name: "Annual Financial Statement 2025", date: "Dec 31, 2025", by: "Elena Volkov", size: "1.2 MB", format: "PDF",   color: COLORS.forestText },
+          { reportId: "ministry", name: "Q4 Ministry Report",              date: "Dec 15, 2025", by: "Pastor Vladimir", size: "840 KB", format: "PDF",   color: COLORS.green },
+          { reportId: "donor",    name: "Donor List for Year-End Letters", date: "Dec 10, 2025", by: "Elena Volkov",    size: "2.1 MB", format: "EXCEL", color: COLORS.copper },
+          { reportId: "board",    name: "Camp & Retreat P&L",              date: "Dec 1, 2025",  by: "Elena Volkov",    size: "320 KB", format: "PDF",   color: COLORS.amber },
         ].map((e, i, arr) => (
           <div key={i} style={{
             padding: "12px 0", borderBottom: i < arr.length - 1 ? `1px solid ${COLORS.borderSoft}` : "none",
@@ -7478,7 +7522,15 @@ const ReportsPage = ({ campuses, ministries, recurringPayments }) => {
               <div style={{ fontSize: 11, color: COLORS.inkSoft }}>{e.date} · by {e.by} · {e.size}</div>
             </div>
             <Pill tone="copper">{e.format}</Pill>
-            <button style={{ background: "transparent", border: `1px solid ${COLORS.border}`, cursor: "pointer", color: COLORS.ink, padding: 7, borderRadius: 7 }}>
+            <button
+              onClick={() => {
+                const ctx = buildReportCtx({ ministries, payments: recurringPayments, campuses, scope: "all", periodLabel: "FY 2025" });
+                const csv = REPORT_CSV[e.reportId]?.(ctx) || "";
+                if (csv) downloadFile(`${e.reportId}_recent_${todayStr()}.csv`, csv);
+              }}
+              title="Re-download as CSV"
+              style={{ background: "transparent", border: `1px solid ${COLORS.border}`, cursor: "pointer", color: COLORS.ink, padding: 7, borderRadius: 7 }}
+            >
               <Download size={13} />
             </button>
           </div>
@@ -7584,6 +7636,69 @@ const ReceiptModal = ({ ministry, onClose }) => {
 // ============================================================
 // MAIN APP
 // ============================================================
+
+// ============================================================
+// ERROR BOUNDARY — prevents a render crash from killing the whole app.
+// In prod this would report to Sentry; here it shows a recovery card.
+// ============================================================
+class PageErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(error) { return { error }; }
+  componentDidCatch(error, info) {
+    // Hook for Sentry / DataDog / etc.
+    if (typeof window !== "undefined" && window.console) {
+      console.error("PageErrorBoundary caught:", error, info);
+    }
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div style={{ padding: 40, maxWidth: 640, margin: "60px auto" }}>
+        <div style={{
+          padding: 28, borderRadius: 14, border: `1px solid ${COLORS.red}40`,
+          backgroundColor: "rgba(255,59,138,0.06)",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: COLORS.red, color: ON_PINK, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <AlertTriangle size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: COLORS.red, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Something went wrong</div>
+              <div style={{ fontFamily: fontDisplay, fontSize: 19, fontWeight: 600, color: COLORS.ink, marginTop: 2 }}>
+                This page crashed
+              </div>
+            </div>
+          </div>
+          <div style={{ fontSize: 13, color: COLORS.inkSoft, lineHeight: 1.6, marginBottom: 16 }}>
+            The rest of the app is still running. Try reloading, or switch to a different page from the sidebar.
+            If this keeps happening, send the error message below to support.
+          </div>
+          <pre style={{
+            padding: 12, backgroundColor: COLORS.cream, borderRadius: 8,
+            fontSize: 11, color: COLORS.ink, fontFamily: "ui-monospace, monospace",
+            overflow: "auto", maxHeight: 200, margin: 0, whiteSpace: "pre-wrap",
+          }}>
+            {String(this.state.error?.message || this.state.error)}
+          </pre>
+          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+            <button
+              onClick={() => this.setState({ error: null })}
+              style={{ padding: "10px 18px", backgroundColor: COLORS.forest, color: ON_LIME, border: "none", borderRadius: 9, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fontBody }}
+            >
+              Try again
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              style={{ padding: "10px 18px", backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.border}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: fontBody }}
+            >
+              Reload app
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
 
 function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
   const [activePage, setActivePage] = useState("dashboard");
@@ -7786,7 +7901,7 @@ function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
   const content = useMemo(() => {
     const open = (m) => setReceiptModal({ open: true, ministry: m });
     switch (activePage) {
-      case "dashboard": return <DashboardPage ministries={filteredMinistries} operatingOverheadMo={operatingOverheadMo} survivalFloorMo={survivalFloorMo} activeCampus={activeCampus} campuses={campuses} />;
+      case "dashboard": return <DashboardPage ministries={filteredMinistries} operatingOverheadMo={operatingOverheadMo} survivalFloorMo={survivalFloorMo} activeCampus={activeCampus} campuses={campuses} setActivePage={setActivePage} />;
       case "donations": return <DonationsPage />;
       case "expenses": return <ExpensesPage />;
       case "smart": return <SmartBudgetPage currentUser={currentUser} activeCampus={activeCampus} campuses={campuses} />;
@@ -7826,7 +7941,7 @@ function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
         routingMode={routingMode} setRoutingMode={setRoutingMode}
         connections={connections} upsertConnection={upsertConnection}
       />;
-      default: return <DashboardPage ministries={filteredMinistries} operatingOverheadMo={operatingOverheadMo} survivalFloorMo={survivalFloorMo} activeCampus={activeCampus} campuses={campuses} />;
+      default: return <DashboardPage ministries={filteredMinistries} operatingOverheadMo={operatingOverheadMo} survivalFloorMo={survivalFloorMo} activeCampus={activeCampus} campuses={campuses} setActivePage={setActivePage} />;
     }
   }, [activePage, ministries, admins, activityLog, recurringPayments, operatingOverheadMo, survivalFloorMo, campuses, activeCampus, filteredMinistries, filteredRecurringPayments, campusStats, themeMode]);
 
@@ -7862,8 +7977,9 @@ function IRCChurchApp({ demo = false, onExitDemo = () => {} }) {
           currentUser={currentUser}
           setCurrentUser={setCurrentUser}
           users={USERS}
+          setActivePage={setActivePage}
         />
-        {content}
+        <PageErrorBoundary key={activePage}>{content}</PageErrorBoundary>
       </main>
 
       {receiptModal.open && (
